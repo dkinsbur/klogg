@@ -1781,7 +1781,7 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
         const int xPos = contentStartPosX + CONTENT_MARGIN_WIDTH;
 
         // string to print, cut to fit the length and position of the view
-        const QString line = lines[ i.get() ];
+        QString line = lines[ i.get() ];
         
         if (filter_src_line)
         {
