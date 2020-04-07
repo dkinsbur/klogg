@@ -262,6 +262,12 @@ void DigitsBuffer::timerEvent( QTimerEvent* event )
     }
 }
 
+bool filter_src_line = true;
+
+QRegExp srcRegex( ",\"[^:\"]+:\\d+\"" );
+QRegExp catalodIdRegex( ",\"0x[a-fA-F0-9]+\"" );
+
+
 AbstractLogView::AbstractLogView( const AbstractLogData* newLogData,
                                   const QuickFindPattern* const quickFindPattern, QWidget* parent )
     : QAbstractScrollArea( parent )
@@ -493,6 +499,21 @@ void AbstractLogView::mouseDoubleClickEvent( QMouseEvent* mouseEvent )
 
         const QPoint pos = convertCoordToFilePos( mouseEvent->pos() );
         selectWordAtPosition( pos );
+    }
+
+    auto line = convertCoordToLine( mouseEvent->pos().y() );
+    if ( line.has_value() ) 
+    {
+        auto string = logData->getLineString( *line );
+        QString command( "python" );
+        QStringList params = QStringList() << "klogg.py" << string;
+
+        QProcess* process = new QProcess();
+        process->start( command, params );
+
+        process->waitForFinished();
+        QString p_stdout = process->readAll();
+        process->close();
     }
 
     emit activity();
@@ -1761,6 +1782,13 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
 
         // string to print, cut to fit the length and position of the view
         const QString line = lines[ i.get() ];
+        
+        if (filter_src_line)
+        {
+            line.replace( srcRegex, "" );
+            line.replace( catalodIdRegex, "" );
+        }
+
         const QString cutLine = line.mid( firstCol, nbCols );
 
         if ( selection_.isLineSelected( line_index ) ) {
