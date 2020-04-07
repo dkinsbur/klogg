@@ -35,7 +35,7 @@ def double_click_line(line):
 if __name__ == '__main__':
     try:
         assert len(sys.argv) == 2
-        double_click_line(sys.argv[2])
+        double_click_line(sys.argv[1])
     except:
         import traceback
         LOGGER.error(traceback.format_exc())
