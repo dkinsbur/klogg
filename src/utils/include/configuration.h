@@ -214,6 +214,24 @@ class Configuration final : public Persistable<Configuration> {
         enableVersionChecking_ = enabled;
     }
 
+    bool analysisTextMaskEnabled() const
+    {
+        return analysisTextMaskEnabled_;
+    }
+    void setAnalysisTextMaskEnabled( bool enabled )
+    {
+        analysisTextMaskEnabled_ = enabled;
+    }
+
+    QString analysisTextMaskRegex() const
+    {
+        return analysisTextMaskRegex_;
+    }
+    void setAnalysisTextMaskRegex( QString regex )
+    {
+        analysisTextMaskRegex_ = regex;
+    }
+
     // View settings
     bool isOverviewVisible() const
     {
@@ -363,6 +381,9 @@ class Configuration final : public Persistable<Configuration> {
 
     bool extractArchives_ = true;
     bool extractArchivesAlways_ = false;
+
+    bool analysisTextMaskEnabled_ = true;
+    QString analysisTextMaskRegex_ = ",\"[^:\"]+:\\d+\"\\s*,\"0x[a-fA-F0-9]+\"";
 };
 
 #endif

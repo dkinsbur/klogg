@@ -262,12 +262,6 @@ void DigitsBuffer::timerEvent( QTimerEvent* event )
     }
 }
 
-bool filter_src_line = true;
-
-QRegExp srcRegex( ",\"[^:\"]+:\\d+\"" );
-QRegExp catalodIdRegex( ",\"0x[a-fA-F0-9]+\"" );
-
-
 AbstractLogView::AbstractLogView( const AbstractLogData* newLogData,
                                   const QuickFindPattern* const quickFindPattern, QWidget* parent )
     : QAbstractScrollArea( parent )
@@ -502,8 +496,7 @@ void AbstractLogView::mouseDoubleClickEvent( QMouseEvent* mouseEvent )
     }
 
     auto line = convertCoordToLine( mouseEvent->pos().y() );
-    if ( line.has_value() ) 
-    {
+    if ( line.has_value() ) {
         auto string = logData->getLineString( *line );
         QString command( "python" );
         QStringList params = QStringList() << "klogg.py" << string;
@@ -1090,8 +1083,16 @@ void AbstractLogView::findPreviousSelected()
 void AbstractLogView::copy()
 {
     static QClipboard* clipboard = QApplication::clipboard();
+    QString text = selection_.getSelectedText( logData );
+    
+    const auto& config = Configuration::get();
+    if ( config.analysisTextMaskEnabled() ) 
+    {
+        QRegExp maskRegex( config.analysisTextMaskRegex() );
+        text.replace( maskRegex, "" );
+    }
 
-    clipboard->setText( selection_.getSelectedText( logData ) );
+    clipboard->setText( text );
 }
 
 void AbstractLogView::markSelected()
@@ -1697,6 +1698,14 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
     static constexpr int CONTENT_MARGIN_WIDTH = 1;
     static constexpr int LINE_NUMBER_PADDING = 3;
 
+    const auto& config = Configuration::get();
+    QRegExp maskRegex("");
+    bool maskEnabled = config.analysisTextMaskEnabled();
+    if ( maskEnabled ) 
+    {
+        maskRegex = QRegExp(config.analysisTextMaskRegex());
+    }
+
     // First check the lines to be drawn are within range (might not be the case if
     // the file has just changed)
     const auto lines_in_file = logData->getNbLine();
@@ -1782,11 +1791,10 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
 
         // string to print, cut to fit the length and position of the view
         QString line = lines[ i.get() ];
-        
-        if (filter_src_line)
+
+        if ( maskEnabled ) 
         {
-            line.replace( srcRegex, "" );
-            line.replace( catalodIdRegex, "" );
+            line.replace( maskRegex, "" );
         }
 
         const QString cutLine = line.mid( firstCol, nbCols );

@@ -64,6 +64,8 @@ OptionsDialog::OptionsDialog( QWidget* parent )
     connect( fontFamilyBox, &QComboBox::currentTextChanged, this, &OptionsDialog::updateFontSize );
     connect( incrementalCheckBox, &QCheckBox::toggled,
              [this]( auto ) { this->setupIncremental(); } );
+    connect( analysisEnableMaskCheckBox, &QCheckBox::toggled,
+             [this]( auto ) { this->setupTextMask(); } );
     connect( pollingCheckBox, &QCheckBox::toggled, [this]( auto ) { this->setupPolling(); } );
     connect( searchResultsCacheCheckBox, &QCheckBox::toggled,
              [this]( auto ) { this->setupSearchResultsCache(); } );
@@ -132,6 +134,16 @@ void OptionsDialog::setupIncremental()
     }
     else {
         quickFindSearchBox->setEnabled( true );
+    }
+}
+
+void OptionsDialog::setupTextMask()
+{
+    if ( analysisEnableMaskCheckBox->isChecked() ) {
+        analysisMaskRegexLineEdit->setEnabled( true );
+    }
+    else {
+        analysisMaskRegexLineEdit->setEnabled( false );
     }
 }
 
@@ -239,6 +251,9 @@ void OptionsDialog::updateDialogFromConfig()
 
     // version checking
     checkForNewVersionCheckBox->setChecked( config.versionCheckingEnabled() );
+
+    analysisEnableMaskCheckBox->setChecked( config.analysisTextMaskEnabled() );
+    analysisMaskRegexLineEdit->setText( config.analysisTextMaskRegex() );
 }
 
 //
@@ -306,6 +321,9 @@ void OptionsDialog::updateConfigFromDialog()
 
     // version checking
     config.setVersionCheckingEnabled( checkForNewVersionCheckBox->isChecked() );
+    
+    config.setAnalysisTextMaskEnabled( analysisEnableMaskCheckBox->isChecked() );
+    config.setAnalysisTextMaskRegex( analysisMaskRegexLineEdit->text() );
 
     config.save();
 
