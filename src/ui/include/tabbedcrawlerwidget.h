@@ -22,7 +22,8 @@
 
 #include <QTabWidget>
 #include <QTabBar>
-
+#include <QMessageBox>
+#include "crawlerwidget.h"
 #include "data/loadingstatus.h"
 
 // This class represents glogg's main widget, a tabbed
@@ -42,6 +43,9 @@ class TabbedCrawlerWidget : public QTabWidget
 
           connect( crawler, &T::dataStatusChanged,
                    [this, index]( DataStatus status ) { setTabDataStatus( index, status ); } );
+          // Listen for a changing data status:
+          connect( crawler, &CrawlerWidget::newSelectedLineString,
+                   [this, index]( QString string ) { emit updateLineString( index, string ); } );
 
           addTabBarItem( index, file_name );
 
@@ -52,6 +56,10 @@ class TabbedCrawlerWidget : public QTabWidget
 
       // Set the data status (icon) for the tab number 'index'
       void setTabDataStatus( int index, DataStatus status );
+
+    signals:
+      void updateLineString( int index,  QString text );
+
 
     protected:
       void keyPressEvent( QKeyEvent* event ) override;

@@ -104,6 +104,7 @@ MainWindow::MainWindow( WindowSession session )
     , signalMux_()
     , quickFindMux_( session_.getQuickFindPattern() )
     , mainTabWidget_()
+    , decodeWidget_()
     , tempDir_( QDir::temp().filePath( "klogg_temp_" ) )
 {
     createActions();
@@ -168,6 +169,9 @@ MainWindow::MainWindow( WindowSession session )
     connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, this,
              &MainWindow::currentTabChanged );
 
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::updateLineString, 
+            &decodeWidget_,&DecodeDockWidget::updateTextHandler);
+
     // Establish the QuickFindWidget and mux ( to send requests from the
     // QFWidget to the right window )
     connect( &quickFindWidget_, SIGNAL( patternConfirmed( const QString&, bool ) ), &quickFindMux_,
@@ -189,6 +193,11 @@ MainWindow::MainWindow( WindowSession session )
     connect( &quickFindMux_, SIGNAL( clearNotification() ), &quickFindWidget_,
              SLOT( clearNotification() ) );
 
+    connect( &mainTabWidget_, SIGNAL( currentLine( const QString& ) ), &decodeWidget_,
+             SLOT( updateTextHandler( const QString& ) ) );
+
+    connect( this, SIGNAL( optionsChanged() ), &decodeWidget_, SLOT( applyOptions() ) );
+
     // Construct the QuickFind bar
     quickFindWidget_.hide();
 
@@ -199,12 +208,15 @@ MainWindow::MainWindow( WindowSession session )
     main_layout->addWidget( &quickFindWidget_ );
     central_widget->setLayout( main_layout );
 
+    decodeWidget_.setAllowedAreas( Qt::BottomDockWidgetArea );
+    decodeWidget_.setObjectName( "DockWindow" );
+    addDockWidget( Qt::BottomDockWidgetArea, &decodeWidget_ );
+
     setCentralWidget( central_widget );
 
     auto clipboard = QGuiApplication::clipboard();
     connect( clipboard, &QClipboard::dataChanged, this, &MainWindow::onClipboardDataChanged );
     onClipboardDataChanged();
-
     updateTitleBar( "" );
 }
 

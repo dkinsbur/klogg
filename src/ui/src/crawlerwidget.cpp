@@ -65,7 +65,7 @@
 #include "quickfindpattern.h"
 #include "quickfindwidget.h"
 #include "savedsearches.h"
-
+#include <QMessageBox>
 // Palette for error signaling (yellow background)
 const QPalette CrawlerWidget::errorPalette( QColor( "yellow" ) );
 
@@ -699,6 +699,14 @@ void CrawlerWidget::clearSearchLimits()
 // Private functions
 //
 
+void foo( LineNumber line )
+    {
+    QMessageBox msgBox;
+    msgBox.setText( QString( line.get() ) ); //( (CrawlerWidget*)this->widget( currentIndex() )
+                                             // )->getSelectedText() );
+    msgBox.exec();
+    } 
+
 // Build the widget and connect all the signals, this must be done once
 // the data are attached.
 void CrawlerWidget::setup()
@@ -882,6 +890,11 @@ void CrawlerWidget::setup()
     connect( logMainView, &LogMainView::newSelection, [this]( auto ) { logMainView->update(); } );
     connect( filteredView, &FilteredView::newSelection,
              [this]( auto ) { filteredView->update(); } );
+
+    connect( logMainView, &LogMainView::newSelection, [this]( LineNumber line ) {
+        auto string = logMainView->getLineString( line );
+        emit newSelectedLineString( string );
+    } );
 
     connect( filteredView, &FilteredView::newSelection, this, &CrawlerWidget::jumpToMatchingLine );
 

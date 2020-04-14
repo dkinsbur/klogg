@@ -135,7 +135,8 @@ class CrawlerWidget : public QSplitter,
 
     void keyPressEvent( QKeyEvent* keyEvent ) override;
 
-  signals:
+signals:
+    void newSelection( LineNumber line );
     // Sent to signal the client load has progressed,
     // passing the completion percentage.
     void loadingProgressed( int progress );
@@ -157,6 +158,8 @@ class CrawlerWidget : public QSplitter,
     // Sent when the data status (whether new not seen data are
     // available) has changed
     void dataStatusChanged( DataStatus status );
+
+    void newSelectedLineString( QString string );
 
   private slots:
     // Instructs the widget to start a search using the current search line.
