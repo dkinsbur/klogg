@@ -162,6 +162,11 @@ void Configuration::retrieveFromStorage( QSettings& settings )
         std::transform( sizes.begin(), sizes.end(), std::back_inserter( splitterSizes_ ),
                         []( auto v ) { return v.toInt(); } );
     }
+
+    if ( settings.contains( "analysis.maskEnabled" ) )
+        analysisTextMaskEnabled_ = settings.value( "analysis.maskEnabled" ).toBool();
+    if ( settings.contains( "analysis.maskRegex" ) )
+        analysisTextMaskRegex_ = settings.value( "analysis.maskRegex" ).toString();
 }
 
 void Configuration::saveToStorage( QSettings& settings ) const
@@ -206,6 +211,9 @@ void Configuration::saveToStorage( QSettings& settings ) const
 
     settings.setValue( "defaultView.searchAutoRefresh", searchAutoRefresh_ );
     settings.setValue( "defaultView.searchIgnoreCase", searchIgnoreCase_ );
+    
+    settings.setValue( "analysis.maskEnabled", analysisTextMaskEnabled_ );
+    settings.setValue( "analysis.maskRegex", analysisTextMaskRegex_ );
 
     QList<QVariant> splitterSizes;
     std::transform( splitterSizes_.begin(), splitterSizes_.end(),

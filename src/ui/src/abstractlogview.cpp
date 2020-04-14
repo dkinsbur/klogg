@@ -495,6 +495,20 @@ void AbstractLogView::mouseDoubleClickEvent( QMouseEvent* mouseEvent )
         selectWordAtPosition( pos );
     }
 
+    auto line = convertCoordToLine( mouseEvent->pos().y() );
+    if ( line.has_value() ) {
+        auto string = logData->getLineString( *line );
+        QString command( "python" );
+        QStringList params = QStringList() << "klogg.py" << string;
+
+        QProcess* process = new QProcess();
+        process->start( command, params );
+
+        process->waitForFinished();
+        QString p_stdout = process->readAll();
+        process->close();
+    }
+
     emit activity();
 }
 
@@ -1069,8 +1083,16 @@ void AbstractLogView::findPreviousSelected()
 void AbstractLogView::copy()
 {
     static QClipboard* clipboard = QApplication::clipboard();
+    QString text = selection_.getSelectedText( logData );
+    
+    const auto& config = Configuration::get();
+    if ( config.analysisTextMaskEnabled() ) 
+    {
+        QRegExp maskRegex( config.analysisTextMaskRegex() );
+        text.replace( maskRegex, "" );
+    }
 
-    clipboard->setText( selection_.getSelectedText( logData ) );
+    clipboard->setText( text );
 }
 
 void AbstractLogView::markSelected()
@@ -1676,6 +1698,14 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
     static constexpr int CONTENT_MARGIN_WIDTH = 1;
     static constexpr int LINE_NUMBER_PADDING = 3;
 
+    const auto& config = Configuration::get();
+    QRegExp maskRegex("");
+    bool maskEnabled = config.analysisTextMaskEnabled();
+    if ( maskEnabled ) 
+    {
+        maskRegex = QRegExp(config.analysisTextMaskRegex());
+    }
+
     // First check the lines to be drawn are within range (might not be the case if
     // the file has just changed)
     const auto lines_in_file = logData->getNbLine();
@@ -1760,7 +1790,13 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
         const int xPos = contentStartPosX + CONTENT_MARGIN_WIDTH;
 
         // string to print, cut to fit the length and position of the view
-        const QString line = lines[ i.get() ];
+        QString line = lines[ i.get() ];
+
+        if ( maskEnabled ) 
+        {
+            line.replace( maskRegex, "" );
+        }
+
         const QString cutLine = line.mid( firstCol, nbCols );
 
         if ( selection_.isLineSelected( line_index ) ) {

@@ -683,10 +683,18 @@ void MainWindow::copy()
     static QClipboard* clipboard = QApplication::clipboard();
 
     if ( auto current = currentCrawlerWidget() ) {
-        clipboard->setText( current->getSelectedText() );
+        QString text = current->getSelectedText();
+
+        const auto& config = Configuration::get();
+        if ( config.analysisTextMaskEnabled() ) {
+            QRegExp maskRegex( config.analysisTextMaskRegex() );
+            text.replace( maskRegex, "" );
+        }
+
+        clipboard->setText( text );
 
         // Put it in the global selection as well (X11 only)
-        clipboard->setText( current->getSelectedText(), QClipboard::Selection );
+        clipboard->setText( text, QClipboard::Selection );
     }
 }
 

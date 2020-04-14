@@ -71,6 +71,7 @@ class OptionsDialog : public QDialog, public Ui::OptionsDialog {
     void setupFontList();
     void setupRegexp();
     void setupIncremental();
+    void setupTextMask();
     void setupPolling();
     void setupSearchResultsCache();
     void setupLogging();
@@ -80,6 +81,7 @@ class OptionsDialog : public QDialog, public Ui::OptionsDialog {
     SearchRegexpType getRegexpTypeFromIndex( int index ) const;
 
     void updateDialogFromConfig();
+
 };
 
 #endif
