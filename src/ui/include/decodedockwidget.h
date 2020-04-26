@@ -20,21 +20,51 @@
 #ifndef DECODEDOCKWIDGET_H
 #define DECODEDOCKWIDGET_H
 
-
-#include <QDockWidget>
-#include <QTextEdit>
 #include <QComboBox>
+#include <QDockWidget>
 #include <QFontInfo>
 #include <QProcess.h>
+#include <QTextEdit>
+#include <QTreeWidget>
 
-class DecodeDockWidget : public QDockWidget
-{
-  Q_OBJECT
+struct TreeItemData {
+    QString name;
+};
+
+class TreeItem {
+  public:
+    void Add( TreeItem *);
+    int Count() const;
+    TreeItem* Child( int i ) const;
+    TreeItemData Data;
+
+  private:
+    QVector<TreeItem*> children;
+};
+
+class TreeWidget : public QDockWidget {
+    Q_OBJECT
+
+  public:
+    TreeWidget();
+    ~TreeWidget();
+
+  public slots:
+    void UpdateTreeInfo( TreeItem &root);
+
+signals:
+    void JumpTo( int line );
+
+  private:
+      QTreeWidget tree_;
+};
+
+class DecodeDockWidget : public QDockWidget {
+    Q_OBJECT
 
   public:
     DecodeDockWidget();
     ~DecodeDockWidget();
-
 
   public slots:
     void updateTextHandler( int index, QString text );
@@ -49,11 +79,10 @@ class DecodeDockWidget : public QDockWidget
   private:
     QTextEdit decodedTextBox_;
     QComboBox comboBox_;
-    QString   currStr_;
+    QString currStr_;
     QProcess process_;
 
     void parseLine();
-
 };
 
 #endif // DECODEDOCKWIDGET_H

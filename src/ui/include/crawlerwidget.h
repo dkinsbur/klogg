@@ -161,6 +161,12 @@ signals:
 
     void newSelectedLineString( QString string );
 
+    public slots:
+    // Called when a new line has been selected in the filtered view,
+    // to instruct the main view to jump to the matching line.
+    void jumpToMatchingLine( LineNumber filteredLineNb );
+    void jumpToMatchingLine2( LineNumber filteredLineNb );
+
   private slots:
     // Instructs the widget to start a search using the current search line.
     void startNewSearch();
@@ -174,9 +180,6 @@ signals:
     void exitingQuickFind();
     // Called when new data must be displayed in the filtered window.
     void updateFilteredView( LinesCount nbMatches, int progress, LineNumber initialPosition );
-    // Called when a new line has been selected in the filtered view,
-    // to instruct the main view to jump to the matching line.
-    void jumpToMatchingLine( LineNumber filteredLineNb );
     // Called when the main view is on a new line number
     void updateLineNumberHandler( LineNumber line );
     // Mark a line that has been clicked on the main (top) view.

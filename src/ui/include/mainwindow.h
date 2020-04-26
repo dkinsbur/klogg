@@ -262,6 +262,7 @@ class MainWindow : public QMainWindow {
     // The main widget
     TabbedCrawlerWidget mainTabWidget_;
     DecodeDockWidget decodeWidget_;
+    TreeWidget treeWidget_;
 
     TabbedScratchPad scratchPad_;
 

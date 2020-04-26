@@ -424,6 +424,10 @@ void CrawlerWidget::jumpToMatchingLine( LineNumber filteredLineNb )
     const auto mainViewLine = logFilteredData_->getMatchingLineNumber( filteredLineNb );
     logMainView->selectAndDisplayLine( mainViewLine ); // FIXME: should be done with a signal.
 }
+void CrawlerWidget::jumpToMatchingLine2( LineNumber filteredLineNb )
+{
+    logMainView->selectAndDisplayLine( filteredLineNb ); // FIXME: should be done with a signal.
+}
 
 void CrawlerWidget::updateLineNumberHandler( LineNumber line )
 {
@@ -963,6 +967,8 @@ void CrawlerWidget::setup()
              QOverload<>::of( &FilteredView::setFocus ) );
     connect( filteredView, &FilteredView::exitView, logMainView,
              QOverload<>::of( &LogMainView::setFocus ) );
+
+    connect( filteredView, &FilteredView::newSelection, this, &CrawlerWidget::jumpToMatchingLine );
 }
 
 // Create a new search using the text passed, replace the currently
