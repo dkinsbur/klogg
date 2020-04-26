@@ -196,6 +196,8 @@ class AbstractLogView :
     void selectAll();
 
     bool isFollowEnabled() const { return followMode_; }
+    
+    QString getLineString( LineNumber line ) const;
 
   protected:
     void mousePressEvent( QMouseEvent* mouseEvent ) override;

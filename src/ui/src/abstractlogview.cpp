@@ -499,7 +499,7 @@ void AbstractLogView::mouseDoubleClickEvent( QMouseEvent* mouseEvent )
     if ( line.has_value() ) {
         auto string = logData->getLineString( *line );
         QString command( "python" );
-        QStringList params = QStringList() << "klogg.py" << string;
+        QStringList params = QStringList() << "klogg.py" << "open-source" << string;
 
         QProcess* process = new QProcess();
         process->start( command, params );
@@ -961,6 +961,11 @@ LineNumber AbstractLogView::getViewPosition() const
     return line;
 }
 
+QString AbstractLogView::getLineString( LineNumber line ) const
+{
+    return this->logData->getLineString(line);
+}
+
 void AbstractLogView::searchUsingFunction(
     void ( QuickFind::*search_function )( Selection, QuickFindMatcher ) )
 {
@@ -1084,10 +1089,9 @@ void AbstractLogView::copy()
 {
     static QClipboard* clipboard = QApplication::clipboard();
     QString text = selection_.getSelectedText( logData );
-    
+
     const auto& config = Configuration::get();
-    if ( config.analysisTextMaskEnabled() ) 
-    {
+    if ( config.analysisTextMaskEnabled() ) {
         QRegExp maskRegex( config.analysisTextMaskRegex() );
         text.replace( maskRegex, "" );
     }
@@ -1699,11 +1703,10 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
     static constexpr int LINE_NUMBER_PADDING = 3;
 
     const auto& config = Configuration::get();
-    QRegExp maskRegex("");
+    QRegExp maskRegex( "" );
     bool maskEnabled = config.analysisTextMaskEnabled();
-    if ( maskEnabled ) 
-    {
-        maskRegex = QRegExp(config.analysisTextMaskRegex());
+    if ( maskEnabled ) {
+        maskRegex = QRegExp( config.analysisTextMaskRegex() );
     }
 
     // First check the lines to be drawn are within range (might not be the case if
@@ -1792,8 +1795,7 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
         // string to print, cut to fit the length and position of the view
         QString line = lines[ i.get() ];
 
-        if ( maskEnabled ) 
-        {
+        if ( maskEnabled ) {
             line.replace( maskRegex, "" );
         }
 

@@ -56,6 +56,7 @@
 #include "signalmux.h"
 #include "tabbedcrawlerwidget.h"
 #include "tabbedscratchpad.h"
+#include "decodedockwidget.h"
 
 class QAction;
 class QActionGroup;
@@ -260,6 +261,7 @@ class MainWindow : public QMainWindow {
 
     // The main widget
     TabbedCrawlerWidget mainTabWidget_;
+    DecodeDockWidget decodeWidget_;
 
     TabbedScratchPad scratchPad_;
 
