@@ -208,7 +208,7 @@ MainWindow::MainWindow( WindowSession session )
     main_layout->addWidget( &quickFindWidget_ );
     central_widget->setLayout( main_layout );
 
-    decodeWidget_.setAllowedAreas( Qt::BottomDockWidgetArea );
+    decodeWidget_.setAllowedAreas( Qt::AllDockWidgetAreas );
     decodeWidget_.setObjectName( "DockWindow" );
     addDockWidget( Qt::BottomDockWidgetArea, &decodeWidget_ );
 

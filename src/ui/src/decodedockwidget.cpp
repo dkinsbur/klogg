@@ -17,7 +17,6 @@
  * along with glogg.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include "log.h"
 
 #include <cassert>
@@ -26,7 +25,6 @@
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QDockWidget>
-//#include <QtWebView>
 #include "decodedockwidget.h"
 #include "persistentinfo.h"
 #include "configuration.h"
@@ -34,16 +32,16 @@
 
 DecodeDockWidget::DecodeDockWidget() : QDockWidget(),
     decodedTextBox_(),
-    comboBox_()
-{    
-    QString  command("python");
-    QStringList params = QStringList()<<"-c"<<"import g_script; g_script.comboBox()";
+    comboBox_(),
+    process_()
+{
+    QString command( "python" );
+    QStringList params = QStringList() << "-c" << "import klogg; klogg.projects()";
 
-    QProcess *process = new QProcess();
-    process->start(command, params);
-    process->waitForFinished();
-    QString p_stdout = process->readAll();
-    process->close();
+    process_.start( command, params );
+    process_.waitForFinished();
+    QString p_stdout = process_.readAll();
+    process_.close();
 
     comboBox_.addItems(p_stdout.split(" "));
 
@@ -58,46 +56,48 @@ DecodeDockWidget::DecodeDockWidget() : QDockWidget(),
 
     connect( &comboBox_, SIGNAL(currentTextChanged( const QString& ) ) ,
              this, SLOT( updateProjectHandler( const QString& ) ) );
+    connect( &process_, QOverload<int, QProcess::ExitStatus>::of( &QProcess::finished ), this,
+             &DecodeDockWidget::onFinish );
+
 
     QWidget* view = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout();
 
-    layout->addWidget(&comboBox_);
-    layout->addWidget(&decodedTextBox_);
-    layout->setContentsMargins(1,1,1,1);
-    view->setLayout(layout);
+    layout->addWidget( &comboBox_ );
+    layout->addWidget( &decodedTextBox_ );
+    layout->setContentsMargins( 1, 1, 1, 1 );
+    view->setLayout( layout );
 
-    setWidget(view);
-    setFeatures(DockWidgetMovable|DockWidgetFloatable|DockWidgetClosable);
-    setWindowTitle(tr("Decoded Line"));
-
+    setWidget( view );
+    setFeatures( DockWidgetMovable | DockWidgetFloatable | DockWidgetClosable );
+    setWindowTitle( tr( "Log Info" ) );
 }
 
+DecodeDockWidget::~DecodeDockWidget()
+{
+    process_.close();
+}
+
+void DecodeDockWidget::onFinish( int exitCode, QProcess::ExitStatus exitStatus )
+{
+    if ( exitCode == 0 ) {
+        QString p_stdout = process_.readAll();
+        decodedTextBox_.setHtml( p_stdout );
+    }
+
+    process_.close();
+}
 
 void DecodeDockWidget::updateTextHandler( int index, QString text )
 {
-    currStr_ = text;   
-    QString command( "python" );
-    QStringList params = QStringList() << "klogg.py" << "click" << text;
-    QProcess* process = new QProcess();
-    process->start( command, params );
-    process->waitForFinished();
-    QString p_stdout = process->readAll();
-    process->close();
-    decodedTextBox_.setHtml( p_stdout );
-}
-
-void DecodeDockWidget::parseTextHandler()
-{
+    currStr_ = text;
     parseLine();
 }
 
 void DecodeDockWidget::updateProjectHandler(const QString& proj )
 {
-    // TODO might be not accurate
     parseLine();
 }
-
 
 void DecodeDockWidget::applyOptions()
 {
@@ -114,26 +114,12 @@ void DecodeDockWidget::applyOptions()
     font.setStyleStrategy( QFont::ForceIntegerMetrics );
 #endif
 
-
     decodedTextBox_.setFont(font);
     comboBox_.setFont(font);
 }
 
-
 void DecodeDockWidget::parseLine()
 {
-
-    QString  command("python");
-    QStringList params = QStringList();
-    params.append("g_script.py");
-    params.append(comboBox_.currentText());
-    params.append(currStr_);
-
-
-    QProcess *process = new QProcess();
-    process->start(command, params);
-    process->waitForFinished();
-    QString p_stdout = process->readAll();
-    decodedTextBox_.setHtml(p_stdout);
-    process->close();
+    auto args = QStringList() << "klogg.py" << "parse-line" << comboBox_.currentText() << currStr_;
+    process_.start( QString( "python" ), args );
 }

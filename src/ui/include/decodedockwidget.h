@@ -25,7 +25,7 @@
 #include <QTextEdit>
 #include <QComboBox>
 #include <QFontInfo>
-
+#include <QProcess.h>
 
 class DecodeDockWidget : public QDockWidget
 {
@@ -33,16 +33,16 @@ class DecodeDockWidget : public QDockWidget
 
   public:
     DecodeDockWidget();
-    virtual ~DecodeDockWidget() {}
+    ~DecodeDockWidget();
 
 
   public slots:
     void updateTextHandler( int index, QString text );
 
   private slots:
-    void parseTextHandler();
     void updateProjectHandler( const QString& proj );
     void applyOptions();
+    void onFinish( int exitCode, QProcess::ExitStatus exitStatus );
 
   signals:
 
@@ -50,6 +50,7 @@ class DecodeDockWidget : public QDockWidget
     QTextEdit decodedTextBox_;
     QComboBox comboBox_;
     QString   currStr_;
+    QProcess process_;
 
     void parseLine();
 

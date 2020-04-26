@@ -499,7 +499,7 @@ void AbstractLogView::mouseDoubleClickEvent( QMouseEvent* mouseEvent )
     if ( line.has_value() ) {
         auto string = logData->getLineString( *line );
         QString command( "python" );
-        QStringList params = QStringList() << "klogg.py" << "dclick" << string;
+        QStringList params = QStringList() << "klogg.py" << "open-source" << string;
 
         QProcess* process = new QProcess();
         process->start( command, params );
