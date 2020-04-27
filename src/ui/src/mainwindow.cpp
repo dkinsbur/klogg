@@ -105,7 +105,6 @@ MainWindow::MainWindow( WindowSession session )
     , quickFindMux_( session_.getQuickFindPattern() )
     , mainTabWidget_()
     , decodeWidget_()
-    , treeWidget_()
     , tempDir_( QDir::temp().filePath( "klogg_temp_" ) )
 {
     createActions();
@@ -173,7 +172,7 @@ MainWindow::MainWindow( WindowSession session )
     connect( &mainTabWidget_, &TabbedCrawlerWidget::updateLineString, &decodeWidget_,
              &DecodeDockWidget::updateTextHandler );
 
-    connect( &treeWidget_, &TreeWidget::JumpTo, [this]( int line ) {
+    connect( &decodeWidget_, &DecodeDockWidget::JumpTo, [this]( int line ) {
         auto widg = (CrawlerWidget*)mainTabWidget_.currentWidget();
         if ( widg != NULL ) {
 
@@ -216,11 +215,8 @@ MainWindow::MainWindow( WindowSession session )
 
     decodeWidget_.setAllowedAreas( Qt::AllDockWidgetAreas );
     decodeWidget_.setObjectName( "DockWindow" );
-    addDockWidget( Qt::BottomDockWidgetArea, &decodeWidget_ );
+    addDockWidget( Qt::LeftDockWidgetArea, &decodeWidget_ );
 
-    treeWidget_.setAllowedAreas( Qt::AllDockWidgetAreas );
-    treeWidget_.setObjectName( "TreeWindow" );
-    addDockWidget( Qt::BottomDockWidgetArea, &treeWidget_ );
 
     setCentralWidget( central_widget );
 

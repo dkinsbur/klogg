@@ -27,38 +27,49 @@
 #include <QTextEdit>
 #include <QTreeWidget>
 
-struct TreeItemData {
+struct LogObject {
     QString name;
+    uint32_t line;
 };
 
-class TreeItem {
+class LogObjectItem {
   public:
-    void Add( TreeItem *);
-    int Count() const;
-    TreeItem* Child( int i ) const;
-    TreeItemData Data;
+    static LogObjectItem* loadJson(QString path);
+
+    LogObjectItem( LogObject& data, LogObjectItem* parent);
+    LogObjectItem( );
+    ~LogObjectItem();
+    int count() const;
+    LogObjectItem* getChild( int i ) const;
+    LogObjectItem* getParent() const;
+    LogObject& getData() ;
+    LogObjectItem* addChild( LogObject& data, int index=-1);
 
   private:
-    QVector<TreeItem*> children;
+    QVector<LogObjectItem*> _children;
+    LogObject _data;
+    LogObjectItem* _parent;
 };
 
-class TreeWidget : public QDockWidget {
-    Q_OBJECT
-
-  public:
-    TreeWidget();
-    ~TreeWidget();
-
-  public slots:
-    void UpdateTreeInfo( TreeItem &root);
-
-signals:
-    void JumpTo( int line );
-
-  private:
-      QTreeWidget tree_;
-};
-
+//class TreeWidget : public QDockWidget {
+//    Q_OBJECT
+//
+//  public:
+//    TreeWidget();
+//    ~TreeWidget();
+//
+////  public slots:
+////    void UpdateTreeInfo( LogObjectItem& root );
+////
+////signals:
+////    void JumpTo( int line );
+//
+//  private:
+//      //QTreeWidget tree_;
+//    //void AddLogObject( LogObjectItem* object, QTreeWidget* parent );
+//    //  void AddLogObject( LogObjectItem* object, QTreeWidgetItem* parent );
+//};
+//
 class DecodeDockWidget : public QDockWidget {
     Q_OBJECT
 
@@ -74,13 +85,21 @@ class DecodeDockWidget : public QDockWidget {
     void applyOptions();
     void onFinish( int exitCode, QProcess::ExitStatus exitStatus );
 
+  public slots:
+    void UpdateTreeInfo( LogObjectItem& root );
+
   signals:
+    void JumpTo( int line );
 
   private:
     QTextEdit decodedTextBox_;
     QComboBox comboBox_;
     QString currStr_;
     QProcess process_;
+    QTreeWidget tree_;
+
+    void AddLogObject( LogObjectItem* object, QTreeWidget* parent );
+    void AddLogObject( LogObjectItem* object, QTreeWidgetItem* parent );
 
     void parseLine();
 };
