@@ -53,7 +53,7 @@ void DecodeDockWidget::updatedMinimap( MinimapObject* root )
 {
 
     tree_.clear();
-    decodedTextBox_.clear();
+    updateMinimapObjectInfo( QStringLiteral( "" ) );
 
     if ( root == NULL ) {
         return;
@@ -132,14 +132,8 @@ DecodeDockWidget::DecodeDockWidget()
         auto item = tree_.currentItem();
         if ( item != nullptr ) {
             auto data = item->data( 0, Qt::UserRole ).value<ObjectInfo*>();
+            updateMinimapObjectInfo( data->info );
             emit MinimapObjectChanged( data->line );
-        }
-    } );
-    connect( &tree_, &QTreeWidget::itemSelectionChanged, [this]() {
-        auto item = tree_.currentItem();
-        if ( item != nullptr ) {
-            auto data = item->data( 0, Qt::UserRole ).value<ObjectInfo*>();
-            decodedTextBox_.setHtml( data->info );
         }
     } );
     connect( &decodedTextBox_, &QTextBrowser::anchorClicked, [this]( const QUrl& link ) {
@@ -149,7 +143,6 @@ DecodeDockWidget::DecodeDockWidget()
             selectTreeItemById( id );
         }
     } );
-
 }
 
 DecodeDockWidget::~DecodeDockWidget()
@@ -157,11 +150,18 @@ DecodeDockWidget::~DecodeDockWidget()
     process_.close();
 }
 
+void DecodeDockWidget::updateMinimapObjectInfo( QString& info )
+{
+    minimapInfo_ = info;
+    updatedHtml();
+}
+
 void DecodeDockWidget::onFinish( int exitCode, QProcess::ExitStatus exitStatus )
 {
     if ( exitCode == 0 ) {
         QString p_stdout = process_.readAll();
-        decodedTextBox_.setHtml( p_stdout );
+        parsedLine_ = p_stdout;
+        updatedHtml();
     }
 
     process_.close();
@@ -170,12 +170,12 @@ void DecodeDockWidget::onFinish( int exitCode, QProcess::ExitStatus exitStatus )
 void DecodeDockWidget::updateTextHandler( int index, QString text )
 {
     currStr_ = text;
-    // parseLine();
+    parseLine();
 }
 
 void DecodeDockWidget::updateProjectHandler( const QString& proj )
 {
-    // parseLine();
+    parseLine();
 }
 
 void DecodeDockWidget::applyOptions()
@@ -197,8 +197,15 @@ void DecodeDockWidget::applyOptions()
     comboBox_.setFont( font );
 }
 
+void DecodeDockWidget::updatedHtml() {
+    decodedTextBox_.setHtml( minimapInfo_ + "<br><br>" + parsedLine_ );
+}
+
 void DecodeDockWidget::parseLine()
 {
+    parsedLine_ = "";
+    updatedHtml();
+
     auto args = QStringList() << "klogg.py"
                               << "parse-line" << comboBox_.currentText() << currStr_;
     process_.start( QString( "python" ), args );

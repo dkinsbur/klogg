@@ -51,14 +51,17 @@ class DecodeDockWidget : public QDockWidget {
     QTextBrowser decodedTextBox_;
     QComboBox comboBox_;
     QString currStr_;
+    QString parsedLine_;
     QProcess process_;
     QTreeWidget tree_;
+    QString minimapInfo_;
 
     void AddLogObject( MinimapObject* object, QTreeWidget* parent );
     void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );
 
     void parseLine();
     void selectTreeItemById( uint64_t id );
+    void updateMinimapObjectInfo( QString& info );
+    void updatedHtml();
 };
-
 #endif // DECODEDOCKWIDGET_H
