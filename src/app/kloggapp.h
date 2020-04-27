@@ -85,11 +85,6 @@ class KloggApp : public SingleApplication {
             QObject::connect( &messageReceiver_, &MessageReceiver::loadFile, this,
                               &KloggApp::loadFileNonInteractive );
 
-            // Version checker notification
-            connect( &versionChecker_, &VersionChecker::newVersionFound,
-                     [this]( const QString& new_version, const QString& url ) {
-                         newVersionNotification( new_version, url );
-                     } );
         }
     }
 
@@ -186,7 +181,6 @@ class KloggApp : public SingleApplication {
     void startBackgroundTasks()
     {
         LOG( logDEBUG ) << "startBackgroundTasks";
-        versionChecker_.startCheck();
     }
 
 #ifdef Q_OS_MAC
@@ -294,7 +288,6 @@ class KloggApp : public SingleApplication {
     std::list<std::pair<WindowSession, MainWindow*>> mainWindows_;
     std::stack<QPointer<MainWindow>> activeWindows_;
 
-    VersionChecker versionChecker_;
 
     std::unique_ptr<CrashTracer> crashTracer_;
 };
