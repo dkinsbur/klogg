@@ -24,52 +24,10 @@
 #include <QDockWidget>
 #include <QFontInfo>
 #include <QProcess.h>
-#include <QTextEdit>
+#include <QTextBrowser>
 #include <QTreeWidget>
+#include "minimap.h"
 
-struct LogObject {
-    QString name;
-    uint32_t line;
-};
-
-class LogObjectItem {
-  public:
-    static LogObjectItem* loadJson(QString path);
-
-    LogObjectItem( LogObject& data, LogObjectItem* parent);
-    LogObjectItem( );
-    ~LogObjectItem();
-    int count() const;
-    LogObjectItem* getChild( int i ) const;
-    LogObjectItem* getParent() const;
-    LogObject& getData() ;
-    LogObjectItem* addChild( LogObject& data, int index=-1);
-
-  private:
-    QVector<LogObjectItem*> _children;
-    LogObject _data;
-    LogObjectItem* _parent;
-};
-
-//class TreeWidget : public QDockWidget {
-//    Q_OBJECT
-//
-//  public:
-//    TreeWidget();
-//    ~TreeWidget();
-//
-////  public slots:
-////    void UpdateTreeInfo( LogObjectItem& root );
-////
-////signals:
-////    void JumpTo( int line );
-//
-//  private:
-//      //QTreeWidget tree_;
-//    //void AddLogObject( LogObjectItem* object, QTreeWidget* parent );
-//    //  void AddLogObject( LogObjectItem* object, QTreeWidgetItem* parent );
-//};
-//
 class DecodeDockWidget : public QDockWidget {
     Q_OBJECT
 
@@ -79,29 +37,28 @@ class DecodeDockWidget : public QDockWidget {
 
   public slots:
     void updateTextHandler( int index, QString text );
+    void updatedMinimap( MinimapObject* root );
 
   private slots:
     void updateProjectHandler( const QString& proj );
     void applyOptions();
     void onFinish( int exitCode, QProcess::ExitStatus exitStatus );
 
-  public slots:
-    void UpdateTreeInfo( LogObjectItem& root );
-
   signals:
-    void JumpTo( int line );
+    void MinimapObjectChanged( int line );
 
   private:
-    QTextEdit decodedTextBox_;
+    QTextBrowser decodedTextBox_;
     QComboBox comboBox_;
     QString currStr_;
     QProcess process_;
     QTreeWidget tree_;
 
-    void AddLogObject( LogObjectItem* object, QTreeWidget* parent );
-    void AddLogObject( LogObjectItem* object, QTreeWidgetItem* parent );
+    void AddLogObject( MinimapObject* object, QTreeWidget* parent );
+    void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );
 
     void parseLine();
+    void selectTreeItemById( uint64_t id );
 };
 
 #endif // DECODEDOCKWIDGET_H

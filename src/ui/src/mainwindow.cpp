@@ -169,10 +169,17 @@ MainWindow::MainWindow( WindowSession session )
     connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, this,
              &MainWindow::currentTabChanged );
 
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, [this]( int index ) {
+        if ( index > -1 ) {
+            auto* crawler_widget = static_cast<CrawlerWidget*>( mainTabWidget_.widget( index ) );
+            decodeWidget_.updatedMinimap( crawler_widget->minimap() );
+        }
+    } );
+
     connect( &mainTabWidget_, &TabbedCrawlerWidget::updateLineString, &decodeWidget_,
              &DecodeDockWidget::updateTextHandler );
 
-    connect( &decodeWidget_, &DecodeDockWidget::JumpTo, [this]( int line ) {
+    connect( &decodeWidget_, &DecodeDockWidget::MinimapObjectChanged, [this]( int line ) {
         auto widg = (CrawlerWidget*)mainTabWidget_.currentWidget();
         if ( widg != NULL ) {
 
@@ -1306,6 +1313,7 @@ bool MainWindow::loadFile( const QString& fileName, bool followFile )
                 signalCrawlerToFollowFile( crawler_widget );
                 followAction->setChecked( true );
             }
+
         } catch ( ... ) {
             LOG( logERROR ) << "Can't open file " << fileName.toStdString();
             return false;

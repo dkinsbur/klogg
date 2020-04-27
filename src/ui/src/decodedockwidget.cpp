@@ -29,183 +29,51 @@
 #include <QHBoxLayout>
 #include <QProcess>
 
-#include <QFile.h>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-
-void parseJsonObject( QJsonObject& obj, LogObjectItem* parent)
-{
-    LogObject o;
-    o.line = obj[ "line" ].toInt(0);
-    o.name = obj[ "name" ].toString("");
-    LogObjectItem* parsedItem = parent->addChild( o );
-
-    auto children = obj[ "children" ].toArray();
-    for ( int i=0; i < children.count(); i++ ) {
-        parseJsonObject( children.at( i ).toObject(), parsedItem );
-    }
-}
-
-LogObjectItem* LogObjectItem::loadJson( QString path )
-{
-    QFile infoFile( path );
-
-    if ( !infoFile.open( QIODevice::ReadOnly ) ) {
-        return nullptr;
-    }
-
-    QByteArray data = infoFile.readAll();
-
-    QJsonDocument loadDoc( QJsonDocument::fromJson( data ) );
-
-    LogObjectItem* root = new LogObjectItem();
-    bool success = false;
-
-    auto children = loadDoc.array();
-    for ( int i=0; i < children.count(); i++ ) {
-        parseJsonObject( children.at( i ).toObject(), root );
-    }
-
-    success = true;
-
-    if ( !success ) {
-        delete root;
-        root = nullptr;
-    }
-
-    return root;
-}
-
-LogObjectItem::LogObjectItem( LogObject& data, LogObjectItem* parent )
-    : _data( data )
-    , _parent( parent )
-{
-}
-LogObjectItem::LogObjectItem()
-    : _data()
-    , _parent( nullptr )
-{
-}
-
-LogObjectItem::~LogObjectItem()
-{
-    qDeleteAll( _children );
-}
-
-int LogObjectItem::count() const
-{
-    return _children.count();
-}
-
-LogObjectItem* LogObjectItem::getChild( int i ) const
-{
-    if ( i < 0 || i >= _children.count() ) {
-        return nullptr;
-    }
-    return _children.at( i );
-}
-
-LogObjectItem* LogObjectItem::getParent() const
-{
-    return _parent;
-}
-
-LogObject& LogObjectItem::getData()
-{
-    return _data;
-}
-
-LogObjectItem* LogObjectItem::addChild( LogObject& data, int index )
-{
-    auto child = new LogObjectItem( data, this );
-    if ( index < 0 ) {
-        _children.append( child );
-    }
-    else {
-        _children.insert( index, child );
-    }
-    return child;
-}
-
-// class MiniMap {
-//  public:
-//    MiniMap( QJsonDocument& );
-//    ~MiniMap();
-//
-//  private:
-//};
-//
-// MiniMap::MiniMap( QJsonDocument& json ){ Json }
-//
-// MiniMap::~MiniMap()
-//{
-//}
-//
-//#include <QMessageBox.h>
-//TreeWidget::TreeWidget()
-//    : QDockWidget()
-//    , tree_()
-//{
-//    QWidget* view = new QWidget();
-//    QVBoxLayout* layout = new QVBoxLayout();
-//    tree_.setColumnCount( 1 );
-//    tree_.setHeaderHidden( true );
-//
-//    layout->addWidget( &tree_ );
-//    layout->setContentsMargins( 1, 1, 1, 1 );
-//    view->setLayout( layout );
-//
-//   // connect( &tree_, &QTreeWidget::itemDoubleClicked, [this]( QTreeWidgetItem* item, int column ) {
-//   //     if ( item != nullptr ) {
-//   //         JumpTo( item->data( 0, Qt::UserRole ).toInt() );
-//   //     }
-//   // } );
-//    connect( &tree_, &QTreeWidget::itemSelectionChanged, [this]() {
-//        auto item = tree_.currentItem();
-//        if ( item != nullptr ) {
-//            JumpTo( item->data( 0, Qt::UserRole ).toInt() );
-//        }
-//    } );
-//
-//    setWidget( view );
-//    setFeatures( DockWidgetMovable | DockWidgetFloatable | DockWidgetClosable );
-//    setWindowTitle( tr( "Log Layout" ) );
-//    
-//    auto root = LogObjectItem::loadJson( QStringLiteral("C:\\Users\\dkinsbur\\git\\klogg\\build\\src\\app\\test.json" ) );
-//    UpdateTreeInfo( *root );
-//}
-//TreeWidget::~TreeWidget() {}
-
-void DecodeDockWidget::AddLogObject( LogObjectItem* object, QTreeWidget* parent )
+void DecodeDockWidget::AddLogObject( MinimapObject* object, QTreeWidget* parent )
 {
     auto data = object->getData();
-    auto item = new QTreeWidgetItem( parent, QStringList() << data.name );
-    item->setData( 0, Qt::UserRole, data.line );
+    auto item = new QTreeWidgetItem( parent, QStringList() << data->name );
+    item->setData( 0, Qt::UserRole, qVariantFromValue( data ) );
     for ( int i = 0; i < object->count(); i++ ) {
         AddLogObject( object->getChild( i ), item );
     }
 }
 
-void DecodeDockWidget::AddLogObject( LogObjectItem* object, QTreeWidgetItem* parent )
+void DecodeDockWidget::AddLogObject( MinimapObject* object, QTreeWidgetItem* parent )
 {
     auto data = object->getData();
-    auto item = new QTreeWidgetItem( parent, QStringList() << data.name );
-    item->setData( 0, Qt::UserRole, data.line );
+    auto item = new QTreeWidgetItem( parent, QStringList() << data->name );
+    item->setData( 0, Qt::UserRole, qVariantFromValue( data ) );
     for ( int i = 0; i < object->count(); i++ ) {
         AddLogObject( object->getChild( i ), item );
     }
 }
 
-void DecodeDockWidget::UpdateTreeInfo( LogObjectItem& root )
+void DecodeDockWidget::updatedMinimap( MinimapObject* root )
 {
 
     tree_.clear();
+    decodedTextBox_.clear();
 
-    for ( int i = 0; i < root.count(); i++ ) {
-        AddLogObject( root.getChild( i ), &tree_ );
+    if ( root == NULL ) {
+        return;
     }
-    //    tree_.insertTopLevelItems( 0, items );
+
+    for ( int i = 0; i < root->count(); i++ ) {
+        AddLogObject( root->getChild( i ), &tree_ );
+    }
+}
+void DecodeDockWidget::selectTreeItemById( uint64_t id )
+{
+    auto iter = QTreeWidgetItemIterator( &tree_ );
+    while ( *iter ) {
+        auto data = ( *iter )->data( 0, Qt::UserRole ).value<ObjectInfo*>();
+        if ( data->id == id ) {
+            tree_.setCurrentItem( ( *iter ) );
+            return;
+        }
+        ++iter;
+    }
 }
 
 DecodeDockWidget::DecodeDockWidget()
@@ -243,8 +111,12 @@ DecodeDockWidget::DecodeDockWidget()
     QWidget* view = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout();
 
+    decodedTextBox_.setOpenExternalLinks( false );
+    decodedTextBox_.setOpenLinks( false );
+
     tree_.setColumnCount( 1 );
     tree_.setHeaderHidden( true );
+    tree_.setSelectionMode( QAbstractItemView::SingleSelection );
     layout->addWidget( &tree_ );
 
     layout->addWidget( &comboBox_ );
@@ -256,17 +128,28 @@ DecodeDockWidget::DecodeDockWidget()
     setFeatures( DockWidgetMovable | DockWidgetFloatable | DockWidgetClosable );
     setWindowTitle( tr( "Log Info" ) );
 
-
     connect( &tree_, &QTreeWidget::itemSelectionChanged, [this]() {
         auto item = tree_.currentItem();
         if ( item != nullptr ) {
-            JumpTo( item->data( 0, Qt::UserRole ).toInt() );
+            auto data = item->data( 0, Qt::UserRole ).value<ObjectInfo*>();
+            emit MinimapObjectChanged( data->line );
+        }
+    } );
+    connect( &tree_, &QTreeWidget::itemSelectionChanged, [this]() {
+        auto item = tree_.currentItem();
+        if ( item != nullptr ) {
+            auto data = item->data( 0, Qt::UserRole ).value<ObjectInfo*>();
+            decodedTextBox_.setHtml( data->info );
+        }
+    } );
+    connect( &decodedTextBox_, &QTextBrowser::anchorClicked, [this]( const QUrl& link ) {
+        bool ok;
+        uint64_t id = link.toString().toULongLong( &ok );
+        if ( ok ) {
+            selectTreeItemById( id );
         }
     } );
 
-    auto root = LogObjectItem::loadJson(
-        QStringLiteral( "C:\\Users\\dkinsbur\\git\\klogg\\build\\src\\app\\test.json" ) );
-    UpdateTreeInfo( *root );
 }
 
 DecodeDockWidget::~DecodeDockWidget()
@@ -287,12 +170,12 @@ void DecodeDockWidget::onFinish( int exitCode, QProcess::ExitStatus exitStatus )
 void DecodeDockWidget::updateTextHandler( int index, QString text )
 {
     currStr_ = text;
-    parseLine();
+    // parseLine();
 }
 
 void DecodeDockWidget::updateProjectHandler( const QString& proj )
 {
-    parseLine();
+    // parseLine();
 }
 
 void DecodeDockWidget::applyOptions()
