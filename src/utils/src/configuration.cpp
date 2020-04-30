@@ -167,6 +167,8 @@ void Configuration::retrieveFromStorage( QSettings& settings )
         analysisTextMaskEnabled_ = settings.value( "analysis.maskEnabled" ).toBool();
     if ( settings.contains( "analysis.maskRegex" ) )
         analysisTextMaskRegex_ = settings.value( "analysis.maskRegex" ).toString();
+    if ( settings.contains( "analysis.maskSub" ) )
+        analysisTextMaskSubString_ = settings.value( "analysis.maskSub" ).toString();
 }
 
 void Configuration::saveToStorage( QSettings& settings ) const
@@ -214,6 +216,7 @@ void Configuration::saveToStorage( QSettings& settings ) const
     
     settings.setValue( "analysis.maskEnabled", analysisTextMaskEnabled_ );
     settings.setValue( "analysis.maskRegex", analysisTextMaskRegex_ );
+    settings.setValue( "analysis.maskSub", analysisTextMaskSubString_ );
 
     QList<QVariant> splitterSizes;
     std::transform( splitterSizes_.begin(), splitterSizes_.end(),

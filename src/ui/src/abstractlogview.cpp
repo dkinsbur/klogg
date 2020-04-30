@@ -1093,7 +1093,7 @@ void AbstractLogView::copy()
     const auto& config = Configuration::get();
     if ( config.analysisTextMaskEnabled() ) {
         QRegExp maskRegex( config.analysisTextMaskRegex() );
-        text.replace( maskRegex, "" );
+        text.replace( maskRegex, config.analysisTextMaskSubString() );
     }
 
     clipboard->setText( text );
@@ -1704,9 +1704,11 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
 
     const auto& config = Configuration::get();
     QRegExp maskRegex( "" );
+    QString subString;
     bool maskEnabled = config.analysisTextMaskEnabled();
     if ( maskEnabled ) {
         maskRegex = QRegExp( config.analysisTextMaskRegex() );
+        subString = config.analysisTextMaskSubString();
     }
 
     // First check the lines to be drawn are within range (might not be the case if
@@ -1796,7 +1798,7 @@ void AbstractLogView::drawTextArea( QPaintDevice* paint_device, int32_t delta_y 
         QString line = lines[ i.get() ];
 
         if ( maskEnabled ) {
-            line.replace( maskRegex, "" );
+            line.replace(maskRegex, subString);
         }
 
         const QString cutLine = line.mid( firstCol, nbCols );

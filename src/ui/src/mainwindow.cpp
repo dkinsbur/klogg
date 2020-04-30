@@ -713,7 +713,7 @@ void MainWindow::copy()
         const auto& config = Configuration::get();
         if ( config.analysisTextMaskEnabled() ) {
             QRegExp maskRegex( config.analysisTextMaskRegex() );
-            text.replace( maskRegex, "" );
+            text.replace( maskRegex, config.analysisTextMaskSubString() );
         }
 
         clipboard->setText( text );

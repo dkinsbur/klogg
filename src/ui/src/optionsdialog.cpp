@@ -254,6 +254,7 @@ void OptionsDialog::updateDialogFromConfig()
 
     analysisEnableMaskCheckBox->setChecked( config.analysisTextMaskEnabled() );
     analysisMaskRegexLineEdit->setText( config.analysisTextMaskRegex() );
+    analysisMaskSubStringLineEdit->setText( config.analysisTextMaskSubString() );
 }
 
 //
@@ -324,6 +325,7 @@ void OptionsDialog::updateConfigFromDialog()
     
     config.setAnalysisTextMaskEnabled( analysisEnableMaskCheckBox->isChecked() );
     config.setAnalysisTextMaskRegex( analysisMaskRegexLineEdit->text() );
+    config.setAnalysisTextMaskSubString( analysisMaskSubStringLineEdit->text() );
 
     config.save();
 
