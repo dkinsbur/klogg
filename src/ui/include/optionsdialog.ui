@@ -26,7 +26,7 @@
       <bool>true</bool>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="general_tab">
       <attribute name="title">
@@ -508,7 +508,7 @@
        <item>
         <widget class="QGroupBox" name="groupBox">
          <property name="title">
-          <string>GroupBox</string>
+          <string>Text Masking</string>
          </property>
          <property name="flat">
           <bool>false</bool>
@@ -534,6 +534,20 @@
               </item>
               <item>
                <widget class="QLineEdit" name="analysisMaskRegexLineEdit"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_8">
+              <item>
+               <widget class="QLabel" name="label_10">
+                <property name="text">
+                 <string>Text Mask Sub String</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="analysisMaskSubStringLineEdit"/>
               </item>
              </layout>
             </item>

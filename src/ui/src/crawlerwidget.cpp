@@ -137,6 +137,7 @@ class CrawlerWidgetContext : public ViewContextInterface {
 // the data is attached.
 CrawlerWidget::CrawlerWidget( QWidget* parent )
     : QSplitter( parent )
+    , minimap_(nullptr)
 {
 }
 
@@ -177,6 +178,14 @@ bool CrawlerWidget::isFollowEnabled() const
     return logMainView->isFollowEnabled();
 }
 
+void CrawlerWidget::LoadMiniMap( const QString& fileName )
+{
+    if ( QFileInfo::exists( fileName + ".info" ) ) 
+    {
+        minimap_ = MinimapObject::loadJson( fileName + ".info" );
+    }
+
+}
 QString CrawlerWidget::encodingText() const
 {
     return encoding_text_;
@@ -423,6 +432,10 @@ void CrawlerWidget::jumpToMatchingLine( LineNumber filteredLineNb )
 {
     const auto mainViewLine = logFilteredData_->getMatchingLineNumber( filteredLineNb );
     logMainView->selectAndDisplayLine( mainViewLine ); // FIXME: should be done with a signal.
+}
+void CrawlerWidget::jumpToMatchingLine2( LineNumber filteredLineNb )
+{
+    logMainView->selectAndDisplayLine( filteredLineNb ); // FIXME: should be done with a signal.
 }
 
 void CrawlerWidget::updateLineNumberHandler( LineNumber line )
@@ -700,12 +713,12 @@ void CrawlerWidget::clearSearchLimits()
 //
 
 void foo( LineNumber line )
-    {
+{
     QMessageBox msgBox;
     msgBox.setText( QString( line.get() ) ); //( (CrawlerWidget*)this->widget( currentIndex() )
                                              // )->getSelectedText() );
     msgBox.exec();
-    } 
+}
 
 // Build the widget and connect all the signals, this must be done once
 // the data are attached.
@@ -963,6 +976,8 @@ void CrawlerWidget::setup()
              QOverload<>::of( &FilteredView::setFocus ) );
     connect( filteredView, &FilteredView::exitView, logMainView,
              QOverload<>::of( &LogMainView::setFocus ) );
+
+    connect( filteredView, &FilteredView::newSelection, this, &CrawlerWidget::jumpToMatchingLine );
 }
 
 // Create a new search using the text passed, replace the currently

@@ -169,8 +169,23 @@ MainWindow::MainWindow( WindowSession session )
     connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, this,
              &MainWindow::currentTabChanged );
 
-    connect( &mainTabWidget_, &TabbedCrawlerWidget::updateLineString, 
-            &decodeWidget_,&DecodeDockWidget::updateTextHandler);
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, [this]( int index ) {
+        if ( index > -1 ) {
+            auto* crawler_widget = static_cast<CrawlerWidget*>( mainTabWidget_.widget( index ) );
+            decodeWidget_.updatedMinimap( crawler_widget->minimap() );
+        }
+    } );
+
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::updateLineString, &decodeWidget_,
+             &DecodeDockWidget::updateTextHandler );
+
+    connect( &decodeWidget_, &DecodeDockWidget::MinimapObjectChanged, [this]( int line ) {
+        auto widg = (CrawlerWidget*)mainTabWidget_.currentWidget();
+        if ( widg != NULL ) {
+
+            widg->jumpToMatchingLine2( LineNumber( line ) );
+        }
+    } );
 
     // Establish the QuickFindWidget and mux ( to send requests from the
     // QFWidget to the right window )
@@ -193,9 +208,6 @@ MainWindow::MainWindow( WindowSession session )
     connect( &quickFindMux_, SIGNAL( clearNotification() ), &quickFindWidget_,
              SLOT( clearNotification() ) );
 
-    connect( &mainTabWidget_, SIGNAL( currentLine( const QString& ) ), &decodeWidget_,
-             SLOT( updateTextHandler( const QString& ) ) );
-
     connect( this, SIGNAL( optionsChanged() ), &decodeWidget_, SLOT( applyOptions() ) );
 
     // Construct the QuickFind bar
@@ -210,7 +222,8 @@ MainWindow::MainWindow( WindowSession session )
 
     decodeWidget_.setAllowedAreas( Qt::AllDockWidgetAreas );
     decodeWidget_.setObjectName( "DockWindow" );
-    addDockWidget( Qt::BottomDockWidgetArea, &decodeWidget_ );
+    addDockWidget( Qt::LeftDockWidgetArea, &decodeWidget_ );
+
 
     setCentralWidget( central_widget );
 
@@ -700,7 +713,7 @@ void MainWindow::copy()
         const auto& config = Configuration::get();
         if ( config.analysisTextMaskEnabled() ) {
             QRegExp maskRegex( config.analysisTextMaskRegex() );
-            text.replace( maskRegex, "" );
+            text.replace( maskRegex, config.analysisTextMaskSubString() );
         }
 
         clipboard->setText( text );
@@ -1300,6 +1313,7 @@ bool MainWindow::loadFile( const QString& fileName, bool followFile )
                 signalCrawlerToFollowFile( crawler_widget );
                 followAction->setChecked( true );
             }
+
         } catch ( ... ) {
             LOG( logERROR ) << "Can't open file " << fileName.toStdString();
             return false;
@@ -1492,7 +1506,7 @@ void MainWindow::removeFromFavorites()
 
     auto currentIndex = 0;
 
-    if (const auto crawler = currentCrawlerWidget()) {
+    if ( const auto crawler = currentCrawlerWidget() ) {
         const auto currentPath = session_.getFilename( crawler );
         const auto currentItem = std::find_if( favorites.begin(), favorites.end(),
                                                FavoriteFiles::FullPathComparator( currentPath ) );
@@ -1598,28 +1612,26 @@ void MainWindow::reportIssue() const
     const QString arch = QSysInfo::currentCpuArchitecture();
     const QString built_for = QSysInfo::buildAbi();
 
-    const QString body =
-            QString("Details for the issue\n"
-                    "--------------------\n\n"
-                    "#### What did you do?\n\n\n"
-                    "#### What did you expect to see?\n\n\n"
-                    "#### What did you see instead?\n\n\n"
-                    "Useful extra information\n"
-                    "-------------------------\n"
-                    "> Klogg version %1 (built on %2 from commit %3) [built for %4]\n"
-                    "> running on %5 (%6/%7) [%8]\n"
-                    "> and Qt %9")
-                    .arg(version, buildDate, commit, built_for,
-                         os, kernelType, kernelVersion, arch,
-                         QT_VERSION_STR);
+    const QString body = QString( "Details for the issue\n"
+                                  "--------------------\n\n"
+                                  "#### What did you do?\n\n\n"
+                                  "#### What did you expect to see?\n\n\n"
+                                  "#### What did you see instead?\n\n\n"
+                                  "Useful extra information\n"
+                                  "-------------------------\n"
+                                  "> Klogg version %1 (built on %2 from commit %3) [built for %4]\n"
+                                  "> running on %5 (%6/%7) [%8]\n"
+                                  "> and Qt %9" )
+                             .arg( version, buildDate, commit, built_for, os, kernelType,
+                                   kernelVersion, arch, QT_VERSION_STR );
 
     QUrlQuery query;
-    query.addQueryItem("labels", "type: bug");
-    query.addQueryItem("body", body);
+    query.addQueryItem( "labels", "type: bug" );
+    query.addQueryItem( "body", body );
 
-    QUrl url("https://github.com/variar/klogg/issues/new");
-    url.setQuery(query);
-    QDesktopServices::openUrl(url);
+    QUrl url( "https://github.com/variar/klogg/issues/new" );
+    url.setQuery( query );
+    QDesktopServices::openUrl( url );
 }
 
 // Returns the size in human readable format

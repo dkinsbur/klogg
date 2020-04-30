@@ -20,24 +20,24 @@
 #ifndef DECODEDOCKWIDGET_H
 #define DECODEDOCKWIDGET_H
 
-
-#include <QDockWidget>
-#include <QTextEdit>
 #include <QComboBox>
+#include <QDockWidget>
 #include <QFontInfo>
 #include <QProcess.h>
+#include <QTextBrowser>
+#include <QTreeWidget>
+#include "minimap.h"
 
-class DecodeDockWidget : public QDockWidget
-{
-  Q_OBJECT
+class DecodeDockWidget : public QDockWidget {
+    Q_OBJECT
 
   public:
     DecodeDockWidget();
     ~DecodeDockWidget();
 
-
   public slots:
     void updateTextHandler( int index, QString text );
+    void updatedMinimap( MinimapObject* root );
 
   private slots:
     void updateProjectHandler( const QString& proj );
@@ -45,15 +45,23 @@ class DecodeDockWidget : public QDockWidget
     void onFinish( int exitCode, QProcess::ExitStatus exitStatus );
 
   signals:
+    void MinimapObjectChanged( int line );
 
   private:
-    QTextEdit decodedTextBox_;
+    QTextBrowser decodedTextBox_;
     QComboBox comboBox_;
-    QString   currStr_;
+    QString currStr_;
+    QString parsedLine_;
     QProcess process_;
+    QTreeWidget tree_;
+    QString minimapInfo_;
+
+    void AddLogObject( MinimapObject* object, QTreeWidget* parent );
+    void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );
 
     void parseLine();
-
+    void selectTreeItemById( uint64_t id );
+    void updateMinimapObjectInfo( QString& info );
+    void updatedHtml();
 };
-
 #endif // DECODEDOCKWIDGET_H

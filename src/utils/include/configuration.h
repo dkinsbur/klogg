@@ -231,6 +231,14 @@ class Configuration final : public Persistable<Configuration> {
     {
         analysisTextMaskRegex_ = regex;
     }
+    QString analysisTextMaskSubString() const
+    {
+        return analysisTextMaskSubString_;
+    }
+    void setAnalysisTextMaskSubString( QString subStr )
+    {
+        analysisTextMaskSubString_ = subStr;
+    }
 
     // View settings
     bool isOverviewVisible() const
@@ -384,6 +392,7 @@ class Configuration final : public Persistable<Configuration> {
 
     bool analysisTextMaskEnabled_ = true;
     QString analysisTextMaskRegex_ = ",\"[^:\"]+:\\d+\"\\s*,\"0x[a-fA-F0-9]+\"";
+    QString analysisTextMaskSubString_ = "";
 };
 
 #endif

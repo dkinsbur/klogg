@@ -59,6 +59,7 @@
 #include "overview.h"
 #include "signalmux.h"
 #include "viewinterface.h"
+#include "minimap.h"
 
 class InfoLine;
 class QuickFindPattern;
@@ -102,6 +103,8 @@ class CrawlerWidget : public QSplitter,
     // Returns whether follow is enabled in this crawler
     bool isFollowEnabled() const;
 
+    void LoadMiniMap( const QString& fileName );
+
   public slots:
     // Stop the asynchoronous loading of the file if one is in progress
     // The file is identified by the view attached to it.
@@ -115,6 +118,10 @@ class CrawlerWidget : public QSplitter,
 
   public:
     template <class T> struct access_by;
+    MinimapObject* minimap() const
+    {
+        return minimap_;
+    }
 
   protected:
     // Implementation of the ViewInterface functions
@@ -161,6 +168,12 @@ signals:
 
     void newSelectedLineString( QString string );
 
+    public slots:
+    // Called when a new line has been selected in the filtered view,
+    // to instruct the main view to jump to the matching line.
+    void jumpToMatchingLine( LineNumber filteredLineNb );
+    void jumpToMatchingLine2( LineNumber filteredLineNb );
+
   private slots:
     // Instructs the widget to start a search using the current search line.
     void startNewSearch();
@@ -174,9 +187,6 @@ signals:
     void exitingQuickFind();
     // Called when new data must be displayed in the filtered window.
     void updateFilteredView( LinesCount nbMatches, int progress, LineNumber initialPosition );
-    // Called when a new line has been selected in the filtered view,
-    // to instruct the main view to jump to the matching line.
-    void jumpToMatchingLine( LineNumber filteredLineNb );
     // Called when the main view is on a new line number
     void updateLineNumberHandler( LineNumber line );
     // Mark a line that has been clicked on the main (top) view.
@@ -291,6 +301,7 @@ signals:
     QToolButton* useRegexpButton;
     QToolButton* searchRefreshButton;
     OverviewWidget* overviewWidget_;
+    MinimapObject* minimap_;
 
     // Default palette to be remembered
     QPalette searchInfoLineDefaultPalette;

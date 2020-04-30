@@ -39,6 +39,8 @@ class TabbedCrawlerWidget : public QTabWidget
       template<typename T>
       int addCrawler( T* crawler, const QString& file_name )
       {
+          crawler->LoadMiniMap( file_name );
+
           const auto index = QTabWidget::addTab( crawler, QString{});
 
           connect( crawler, &T::dataStatusChanged,
