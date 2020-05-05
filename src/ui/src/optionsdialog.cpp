@@ -255,6 +255,9 @@ void OptionsDialog::updateDialogFromConfig()
     analysisEnableMaskCheckBox->setChecked( config.analysisTextMaskEnabled() );
     analysisMaskRegexLineEdit->setText( config.analysisTextMaskRegex() );
     analysisMaskSubStringLineEdit->setText( config.analysisTextMaskSubString() );
+    commandLineEdit->setText(config.openSourceCommandTemplate());
+    sourceBaseFolderLineEdit->setText( config.openSourceBaseFolder() );
+    logRegexLineEdit->setText( config.openSourceLineRegex() );
 }
 
 //
@@ -326,6 +329,9 @@ void OptionsDialog::updateConfigFromDialog()
     config.setAnalysisTextMaskEnabled( analysisEnableMaskCheckBox->isChecked() );
     config.setAnalysisTextMaskRegex( analysisMaskRegexLineEdit->text() );
     config.setAnalysisTextMaskSubString( analysisMaskSubStringLineEdit->text() );
+    config.setOpenSourceCommandTemplate(commandLineEdit->text());
+    config.setOpenSourceBaseFolder(sourceBaseFolderLineEdit->text());
+    config.setOpenSourceLineRegex(logRegexLineEdit->text());
 
     config.save();
 

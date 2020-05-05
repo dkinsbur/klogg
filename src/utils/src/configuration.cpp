@@ -169,6 +169,13 @@ void Configuration::retrieveFromStorage( QSettings& settings )
         analysisTextMaskRegex_ = settings.value( "analysis.maskRegex" ).toString();
     if ( settings.contains( "analysis.maskSub" ) )
         analysisTextMaskSubString_ = settings.value( "analysis.maskSub" ).toString();
+
+    if ( settings.contains( "analysis.sourceOpenCommand" ) )
+        openSourceCommandTemplate_ = settings.value( "analysis.sourceOpenCommand" ).toString();
+    if ( settings.contains( "analysis.sourceFolder" ) )
+        openSourceBaseFolder_ = settings.value( "analysis.sourceFolder" ).toString();
+    if ( settings.contains( "analysis.sourceRegex" ) )
+        openSourceLineRegex_ = settings.value( "analysis.sourceRegex" ).toString();
 }
 
 void Configuration::saveToStorage( QSettings& settings ) const
@@ -217,6 +224,10 @@ void Configuration::saveToStorage( QSettings& settings ) const
     settings.setValue( "analysis.maskEnabled", analysisTextMaskEnabled_ );
     settings.setValue( "analysis.maskRegex", analysisTextMaskRegex_ );
     settings.setValue( "analysis.maskSub", analysisTextMaskSubString_ );
+
+    settings.setValue( "analysis.sourceOpenCommand", openSourceCommandTemplate_ );
+    settings.setValue( "analysis.sourceFolder", openSourceBaseFolder_ );
+    settings.setValue( "analysis.sourceRegex", openSourceLineRegex_ );
 
     QList<QVariant> splitterSizes;
     std::transform( splitterSizes_.begin(), splitterSizes_.end(),

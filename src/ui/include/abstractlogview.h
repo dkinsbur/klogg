@@ -462,6 +462,7 @@ class AbstractLogView :
     // Utils functions
     bool isCharWord( char c );
     void updateGlobalSelection();
+    void openLogLineSourceFile( LineNumber& line );
 };
 
 #endif

@@ -497,16 +497,7 @@ void AbstractLogView::mouseDoubleClickEvent( QMouseEvent* mouseEvent )
 
     auto line = convertCoordToLine( mouseEvent->pos().y() );
     if ( line.has_value() ) {
-        auto string = logData->getLineString( *line );
-        QString command( "python" );
-        QStringList params = QStringList() << "klogg.py" << "open-source" << string;
-
-        QProcess* process = new QProcess();
-        process->start( command, params );
-
-        process->waitForFinished();
-        QString p_stdout = process->readAll();
-        process->close();
+        openLogLineSourceFile( *line );
     }
 
     emit activity();
@@ -1996,6 +1987,26 @@ void AbstractLogView::disableFollow()
 {
     emit followModeChanged( false );
     followElasticHook_.hook( false );
+}
+void AbstractLogView::openLogLineSourceFile( LineNumber& line )
+{
+    const auto& config = Configuration::get();
+
+    QDir base( config.openSourceBaseFolder());
+    QRegularExpression re( config.openSourceLineRegex() );
+    auto string = logData->getLineString( line );
+    QRegularExpressionMatch match = re.match( string );
+    if ( match.hasMatch() ) {
+        QString source = match.captured( "source" );
+        QString line = match.captured( "line" );
+        auto sourceFile = base.absoluteFilePath( source );
+        if ( QFile::exists( sourceFile ) ) {
+            QString command = config.openSourceCommandTemplate()
+                .replace( "{line}", line )
+                .replace( "{source}", sourceFile );
+            QProcess::startDetached( command );
+        }
+    }
 }
 
 namespace {

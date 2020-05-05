@@ -240,6 +240,31 @@ class Configuration final : public Persistable<Configuration> {
         analysisTextMaskSubString_ = subStr;
     }
 
+    QString openSourceCommandTemplate() const
+    {
+        return openSourceCommandTemplate_;
+    }
+    void setOpenSourceCommandTemplate( QString cmdTemplate )
+    {
+        openSourceCommandTemplate_ = cmdTemplate;
+    }
+    QString openSourceBaseFolder() const
+    {
+        return openSourceBaseFolder_;
+    }
+    void setOpenSourceBaseFolder( QString baseFolder )
+    {
+        openSourceBaseFolder_ = baseFolder;
+    }
+    QString openSourceLineRegex() const
+    {
+        return openSourceLineRegex_;
+    }
+    void setOpenSourceLineRegex( QString regex )
+    {
+        openSourceLineRegex_ = regex;
+    }
+
     // View settings
     bool isOverviewVisible() const
     {
@@ -393,6 +418,9 @@ class Configuration final : public Persistable<Configuration> {
     bool analysisTextMaskEnabled_ = true;
     QString analysisTextMaskRegex_ = ",\"[^:\"]+:\\d+\"\\s*,\"0x[a-fA-F0-9]+\"";
     QString analysisTextMaskSubString_ = "";
+    QString openSourceCommandTemplate_ = "\"C:\\Program Files (x86)\\Source Insight 4.0\\sourceinsight4.exe\" +{line} \"{source}\"";
+    QString openSourceBaseFolder_ = "c:\\ws_root\\fw";
+    QString openSourceLineRegex_ = "\",\"\\.\\./\\.\\./(?<source>[^:]+):(?<line>\\d+)\"";
 };
 
 #endif
