@@ -35,21 +35,26 @@ class TabbedCrawlerWidget : public QTabWidget
   Q_OBJECT
     public:
       TabbedCrawlerWidget();
-
+      
       template<typename T>
       int addCrawler( T* crawler, const QString& file_name )
       {
           crawler->LoadMiniMap( file_name );
+          crawler->setLogFileName( file_name );
+          emit logViewOpened( crawler );
 
           const auto index = QTabWidget::addTab( crawler, QString{});
-
+          
           connect( crawler, &T::dataStatusChanged,
                    [this, index]( DataStatus status ) { setTabDataStatus( index, status ); } );
           // Listen for a changing data status:
-          connect( crawler, &CrawlerWidget::newSelectedLineString,
-                   [this, index]( QString string ) { emit updateLineString( index, string ); } );
+          connect(crawler, &CrawlerWidget::newLineSelected,
+              [this](LineNumber line, QString& text) { emit newLineSelected(line, text); });
 
           addTabBarItem( index, file_name );
+          
+          
+          //qInfo() << "added:" << index << myTabBar_.tabData( index ).toString();
 
           return index;
       }
@@ -60,12 +65,17 @@ class TabbedCrawlerWidget : public QTabWidget
       void setTabDataStatus( int index, DataStatus status );
 
     signals:
-      void updateLineString( int index,  QString text );
+      void logViewOpened( CrawlerWidget* crawler );
+      void logViewClosed( CrawlerWidget* crawler );
+      void logViewSwitched( CrawlerWidget* crawler );
+      void newLineSelected(LineNumber line, QString& text);
 
 
     protected:
       void keyPressEvent( QKeyEvent* event ) override;
       void mouseReleaseEvent( QMouseEvent *event) override;
+      void tabInserted( int index );
+      void tabRemoved( int index );
 
     private:
       void addTabBarItem( int index, const QString& file_name);

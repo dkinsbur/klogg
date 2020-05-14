@@ -27,155 +27,367 @@
 #include <QComboBox>
 #include <QDockWidget>
 #include <QHBoxLayout>
-#include <QProcess>
 
-void DecodeDockWidget::AddLogObject( MinimapObject* object, QTreeWidget* parent )
+DecodeManager::DecodeManager() : lock_()
 {
-    auto data = object->getData();
-    auto item = new QTreeWidgetItem( parent, QStringList() << data->name );
-    item->setData( 0, Qt::UserRole, qVariantFromValue( data ) );
-    for ( int i = 0; i < object->count(); i++ ) {
-        AddLogObject( object->getChild( i ), item );
+    LOG(logINFO) << "DecodeManager ";
+}
+DecodeManager::~DecodeManager()
+{
+    {
+        QMutexLocker locker(&lock_);
+        states_.clear();
+        logs_.clear();
     }
 }
-
-void DecodeDockWidget::AddLogObject( MinimapObject* object, QTreeWidgetItem* parent )
+void DecodeManager::openLogDecoder(CrawlerWidget* logView)
 {
-    auto data = object->getData();
-    auto item = new QTreeWidgetItem( parent, QStringList() << data->name );
-    item->setData( 0, Qt::UserRole, qVariantFromValue( data ) );
-    for ( int i = 0; i < object->count(); i++ ) {
-        AddLogObject( object->getChild( i ), item );
+    LOG(logINFO) << "openLogDecoder " << logView;
+    
+    shared_ptr<DecodedLog> dl = make_shared<DecodedLog>(logView->logFileName());
+    shared_ptr<DecodedWidgetState> state = make_shared<DecodedWidgetState>();
+
+    {
+        QMutexLocker locker(&lock_);
+        logs_[logView] = dl;
+        states_[logView] = state;
     }
+
+    state->mapTypes = dl->GetMapTypes();
+    state->mapType = state->mapTypes.isEmpty() ? "" : state->mapTypes.first();
+    state->map = state->mapTypes.isEmpty() ? MapTree() : dl->GetMap(state->mapType);
+    
 }
 
-void DecodeDockWidget::updatedMinimap( MinimapObject* root )
+void DecodeManager::switchCurrentLogDecoder(CrawlerWidget* logView)
 {
+    LOG(logINFO) << "switchCurrentLogDecoder:" << logView;
 
-    tree_.clear();
-    updateMinimapObjectInfo( QStringLiteral( "" ) );
+    shared_ptr<DecodedWidgetState> state(nullptr);
 
-    if ( root == NULL ) {
+    {
+        QMutexLocker locker(&lock_);
+        currLog_ = logView;
+        if (states_.contains(logView))
+        {
+            state = states_[currLog_];
+        }
+    }
+    
+    emit widgetStateChanged(state);
+}
+
+void DecodeManager::generateLogMap(const QString& mapType)
+{
+    if (!logs_.contains(currLog_))
+    {
         return;
     }
 
-    for ( int i = 0; i < root->count(); i++ ) {
-        AddLogObject( root->getChild( i ), &tree_ );
+    lock_.lock();
+    auto state = states_[currLog_];
+    auto dl = logs_[currLog_];
+    lock_.unlock();
+
+    if (mapType != state->mapType)
+    {
+        state->mapType = mapType;
+        state->map = dl->GetMap(mapType);
+        emit widgetStateChanged(state);
     }
 }
-void DecodeDockWidget::selectTreeItemById( uint64_t id )
+void DecodeManager::decodeMapItem(uint64_t itemId)
 {
-    auto iter = QTreeWidgetItemIterator( &tree_ );
-    while ( *iter ) {
-        auto data = ( *iter )->data( 0, Qt::UserRole ).value<ObjectInfo*>();
-        if ( data->id == id ) {
-            tree_.setCurrentItem( ( *iter ) );
-            return;
-        }
-        ++iter;
+    if (!logs_.contains(currLog_))
+    {
+        return;
+    }
+
+    lock_.lock();
+    auto state = states_[currLog_];
+    auto dl = logs_[currLog_];
+    lock_.unlock();
+
+    if (itemId != state->mapItem)
+    {
+        state->mapItem = itemId;
+        state->info = dl->DecodeItem(itemId);
+        emit widgetStateChanged(state);
     }
 }
+
+void DecodeManager::closeLogDecoder(CrawlerWidget* logView)
+{
+    LOG(logINFO) << "onLogClose " << logView;
+
+    if (currLog_ == logView)
+    {
+        switchCurrentLogDecoder(nullptr);
+    }
+
+    {
+        QMutexLocker locker(&lock_);
+        if (logs_.contains(logView))
+        {
+            states_.remove(logView);
+            logs_.remove(logView);
+        }
+    }
+}
+
+DecodeManager& DecodeDockWidget::getDecodeManager()
+{
+    return decMgr_;
+}
+
+Q_DECLARE_METATYPE(shared_ptr<DecodedWidgetState>)
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 DecodeDockWidget::DecodeDockWidget()
     : QDockWidget()
     , decodedTextBox_()
-    , comboBox_()
-    , process_()
-    , tree_()
+    , minimapTypeCombo_()
+    , statusbar_()
+    , decMgr_()
+    , decMgrTh_()
 {
-    QString command( "python" );
-    QStringList params = QStringList() << "-c"
-                                       << "import klogg; klogg.projects()";
+    decodedTextBox_.setReadOnly(true);
+    decodedTextBox_.setLineWrapMode(QTextEdit::NoWrap);
+    decodedTextBox_.setAutoFillBackground(true);
+    decodedTextBox_.setOpenExternalLinks(false);
+    decodedTextBox_.setOpenLinks(false);
 
-    process_.start( command, params );
-    process_.waitForFinished();
-    QString p_stdout = process_.readAll();
-    process_.close();
+    minimapTree_.setColumnCount(1);
+    minimapTree_.setHeaderHidden(true);
+    minimapTree_.setSelectionMode(QAbstractItemView::SingleSelection);
+    mainLayout_.addWidget(&minimapTypeCombo_);
+    mainLayout_.addWidget(&minimapTree_);
 
-    comboBox_.addItems( p_stdout.split( " " ) );
+    mainLayout_.addWidget(&decodedTextBox_);
+    mainLayout_.addWidget(&statusbar_);
+    mainLayout_.setContentsMargins(1, 1, 1, 1);
+    mainWidget_.setLayout(&mainLayout_);
+    setWidget(&mainWidget_);
+    setFeatures(DockWidgetMovable | DockWidgetFloatable | DockWidgetClosable);
+    setWindowTitle(tr("Log Info"));
 
-    decodedTextBox_.setReadOnly( true );
-    decodedTextBox_.setLineWrapMode( QTextEdit::NoWrap );
+    decMgr_.moveToThread(&decMgrTh_);
+    decMgrTh_.start();
 
-    QPalette pallet = decodedTextBox_.palette();
-    pallet.setColor( QPalette::Base, Qt::lightGray );
-    decodedTextBox_.setPalette( pallet );
-    //    decodedTextBox_.setTextColor(Qt::yellow);
-    decodedTextBox_.setAutoFillBackground( true );
+    connect(
+        &decMgr_, &DecodeManager::widgetStateChanged, 
+        this, &DecodeDockWidget::reloadWidgetState, 
+        Qt::QueuedConnection
+    );
+    connect(
+        &minimapTypeCombo_, QOverload<const QString&>::of(&QComboBox::currentIndexChanged), 
+        &decMgr_, &DecodeManager::generateLogMap, 
+        Qt::QueuedConnection
+    );
+    connect(
+        &minimapTree_, &QTreeWidget::currentItemChanged,
+        [this](QTreeWidgetItem* current, QTreeWidgetItem* previous){emit selectedMapItemChanged(current->data(0, Qt::UserRole).toULongLong());}
+    );
+    connect(
+        this, &DecodeDockWidget::selectedMapItemChanged,
+        &decMgr_, &DecodeManager::decodeMapItem,
+        Qt::QueuedConnection
+    );
 
-    connect( &comboBox_, SIGNAL( currentTextChanged( const QString& ) ), this,
-             SLOT( updateProjectHandler( const QString& ) ) );
-    connect( &process_, QOverload<int, QProcess::ExitStatus>::of( &QProcess::finished ), this,
-             &DecodeDockWidget::onFinish );
-
-    QWidget* view = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout();
-
-    decodedTextBox_.setOpenExternalLinks( false );
-    decodedTextBox_.setOpenLinks( false );
-
-    tree_.setColumnCount( 1 );
-    tree_.setHeaderHidden( true );
-    tree_.setSelectionMode( QAbstractItemView::SingleSelection );
-    layout->addWidget( &tree_ );
-
-    layout->addWidget( &comboBox_ );
-    layout->addWidget( &decodedTextBox_ );
-    layout->setContentsMargins( 1, 1, 1, 1 );
-    view->setLayout( layout );
-
-    setWidget( view );
-    setFeatures( DockWidgetMovable | DockWidgetFloatable | DockWidgetClosable );
-    setWindowTitle( tr( "Log Info" ) );
-
-    connect( &tree_, &QTreeWidget::itemSelectionChanged, [this]() {
-        auto item = tree_.currentItem();
-        if ( item != nullptr ) {
-            auto data = item->data( 0, Qt::UserRole ).value<ObjectInfo*>();
-            updateMinimapObjectInfo( data->info );
-            emit MinimapObjectChanged( data->line );
-        }
-    } );
-    connect( &decodedTextBox_, &QTextBrowser::anchorClicked, [this]( const QUrl& link ) {
-        bool ok;
-        uint64_t id = link.toString().toULongLong( &ok );
-        if ( ok ) {
-            selectTreeItemById( id );
-        }
-    } );
 }
 
-DecodeDockWidget::~DecodeDockWidget()
+DecodeDockWidget::~DecodeDockWidget() 
 {
-    process_.close();
 }
 
-void DecodeDockWidget::updateMinimapObjectInfo( QString& info )
+void DecodeDockWidget::reloadWidgetState(shared_ptr<DecodedWidgetState> state)
 {
-    minimapInfo_ = info;
-    updatedHtml();
-}
 
-void DecodeDockWidget::onFinish( int exitCode, QProcess::ExitStatus exitStatus )
-{
-    if ( exitCode == 0 ) {
-        QString p_stdout = process_.readAll();
-        parsedLine_ = p_stdout;
-        updatedHtml();
+    if (state == nullptr)
+    {
+        currState_ = DecodedWidgetState();
+        minimapTree_.blockSignals(true);
+        minimapTypeCombo_.blockSignals(true);
+        minimapTypeCombo_.clear();
+        minimapTree_.clear();
+        decodedTextBox_.clear();
+        minimapTree_.blockSignals(false);
+        minimapTypeCombo_.blockSignals(false);
+        return;
     }
 
-    process_.close();
+    auto prev = currState_;
+    currState_ = *state;
+
+    auto index = state->mapTypes.indexOf(state->mapType);
+
+    decodedTextBox_.setHtml(state->info);
+
+    minimapTypeCombo_.blockSignals(true);
+    minimapTypeCombo_.clear();
+    minimapTypeCombo_.addItems(state->mapTypes);
+    if (index >= 0)
+    {
+        minimapTypeCombo_.setCurrentIndex(index);
+    }
+    minimapTypeCombo_.blockSignals(false);
+    
+    
+    if (prev.map != state->map)
+    {
+        updateMap(state->map);
+        auto iter = QTreeWidgetItemIterator(&minimapTree_);
+        while (*iter)
+        {
+            if ((*iter)->data(0, Qt::UserRole).toULongLong() == state->mapItem)
+            {
+                minimapTree_.setCurrentItem(*iter);
+                break;
+            }
+            ++iter;
+        }
+    }
 }
 
-void DecodeDockWidget::updateTextHandler( int index, QString text )
+void DecodeDockWidget::updateMapType(QString& mapType)
 {
-    currStr_ = text;
-    parseLine();
+    //if (currCtx_)
+    //{
+    //    currCtx_->setMinimapType(mapType);
+    //
+    //    if (currCtx_->decodedLog()->IsMapInitialized())
+    //    {
+    //        updateUI(UPDATE_MAP);
+    //    }
+    //}
 }
 
-void DecodeDockWidget::updateProjectHandler( const QString& proj )
+void DecodeDockWidget::updateCurrLog(CrawlerWidget* logView) {}
+void DecodeDockWidget::updateUI(int updateType)
 {
-    parseLine();
+#if 0
+    LOG(logINFO) << "type: " << updateType;
+
+    switch (updateType)
+    {
+
+    case UPDATE_LOG:
+        minimapTypeCombo_.clear();
+        minimapTree_.clear();
+        decodedTextBox_.clear();
+        statusbar_.clearMessage();
+        if (currCtx_)
+        {
+            if (currCtx_->decodedLog()->IsMapInitialized())
+            {
+                auto mapType = currCtx_->minimapType();
+                minimapTypeCombo_.addItems(currCtx_->decodedLog()->GetMapTypes());
+                for (int i = 0; i < minimapTypeCombo_.count(); i++)
+                {
+                    qInfo() << minimapTypeCombo_.itemText(i) << mapType;
+                    if (minimapTypeCombo_.itemText(i) == mapType)
+                    {
+                        minimapTypeCombo_.setCurrentIndex(i);
+                        break;
+                    }
+                }
+            }
+            setStatusMessage((currCtx_->decodedLog()->IsMapInitialized() ? "Lod Decoded"
+                : "Log NOT decoded"));
+        }
+        break;
+    case UPDATE_MAP:
+        decodedTextBox_.clear();
+        if (currCtx_ && currCtx_->decodedLog()->IsMapInitialized())
+        {
+            updatedUIMinimap(currCtx_->decodedLog()->GetMap(currCtx_->minimapType()));
+            auto iter = QTreeWidgetItemIterator(&minimapTree_);
+            while (*iter)
+            {
+                if ((*iter)->data(0, Qt::UserRole).toULongLong())
+                {
+                    minimapTree_.setCurrentItem((*iter));
+                    break;
+                }
+                ++iter;
+            }
+        }
+        break;
+    case UPDATE_ITEM:
+        if (currCtx_ && currCtx_->decodedLog()->IsMapInitialized())
+        {
+            decodedTextBox_.setHtml(
+                currCtx_->decodedLog()->DecodeItem(currCtx_->selectedItem()));
+        }
+        break;
+    }
+#endif
+}
+
+void DecodeDockWidget::updateUISelectedItem(uint64_t item) {}
+
+void DecodeDockWidget::handleLineSelectionChanged(LineNumber line) {}
+void DecodeDockWidget::handleMinimapTypeChange(int index)
+{
+    updateMapType(minimapTypeCombo_.itemText(index));
+}
+void DecodeDockWidget::handleMinimapSelectionChange(QTreeWidgetItem* current,
+    QTreeWidgetItem* previous)
+{
+    //if (currCtx_)
+    //{
+    //    if (current == nullptr)
+    //    {
+    //        currCtx_->setSelectedItem(-1);
+    //    }
+    //    else
+    //    {
+    //        currCtx_->setSelectedItem(current->data(0, Qt::UserRole).toULongLong());
+    //    }
+    //    updateUI(UPDATE_ITEM);
+    //}
+}
+void DecodeDockWidget::handleLinkClick(QString& link) {}
+void DecodeDockWidget::handleForwardBackwardsClick(bool forward) {}
+void DecodeDockWidget::handleDecodeClick() {}
+
+void DecodeDockWidget::MinimapAddItem(MapItem* object, QTreeWidget* parent)
+{
+    auto item = new QTreeWidgetItem(parent, QStringList() << QString::fromStdString(object->name()));
+    item->setData(0, Qt::UserRole, qVariantFromValue(object->id()));
+    for (auto ch : object->children())
+    {
+        MinimapAddItem(ch, item);
+    }
+}
+
+void DecodeDockWidget::MinimapAddItem(MapItem* object, QTreeWidgetItem* parent)
+{
+    auto item = new QTreeWidgetItem(parent, QStringList() << QString::fromStdString(object->name()));
+    item->setData(0, Qt::UserRole, qVariantFromValue(object->id()));
+    for (auto ch : object->children())
+    {
+        MinimapAddItem(ch, item);
+    }
+}
+
+void DecodeDockWidget::updateMap(MapTree root)
+{
+    minimapTree_.blockSignals(true);
+
+    minimapTree_.clear();
+
+    if (root != nullptr)
+    {
+        for (auto ch : root->children())
+        {
+            MinimapAddItem(ch, &minimapTree_);
+        }
+    }
+    minimapTree_.blockSignals(false);
 }
 
 void DecodeDockWidget::applyOptions()
@@ -183,30 +395,21 @@ void DecodeDockWidget::applyOptions()
     const auto& config = Configuration::get();
     QFont font = config.mainFont();
 
-    LOG( logDEBUG ) << "DecodeDockWidget::applyOptions";
+    LOG(logDEBUG) << "DecodeDockWidget::applyOptions";
 
     // Whatever font we use, we should NOT use kerning
-    font.setKerning( false );
-    font.setFixedPitch( true );
+    font.setKerning(false);
+    font.setFixedPitch(true);
 #if QT_VERSION > 0x040700
     // Necessary on systems doing subpixel positionning (e.g. Ubuntu 12.04)
-    font.setStyleStrategy( QFont::ForceIntegerMetrics );
+    font.setStyleStrategy(QFont::ForceIntegerMetrics);
 #endif
 
-    decodedTextBox_.setFont( font );
-    comboBox_.setFont( font );
+    decodedTextBox_.setFont(font);
 }
 
-void DecodeDockWidget::updatedHtml() {
-    decodedTextBox_.setHtml( minimapInfo_ + "<br><br>" + parsedLine_ );
-}
-
-void DecodeDockWidget::parseLine()
+void DecodeDockWidget::setStatusMessage(const QString& text)
 {
-    parsedLine_ = "";
-    updatedHtml();
-
-    auto args = QStringList() << "klogg.py"
-                              << "parse-line" << comboBox_.currentText() << currStr_;
-    process_.start( QString( "python" ), args );
+    LOG(logINFO) << "update status: " << text;
+    statusbar_.showMessage(text);
 }

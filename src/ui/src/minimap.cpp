@@ -17,97 +17,221 @@
  * along with glogg.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//#include "log.h"
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
 #include <QFile.h>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <qdebug.h>
 #include "minimap.h"
+#include "log.h"
 
-void parseJsonObject( QJsonObject& obj, MinimapObject* parent )
+namespace py = pybind11;
+
+MapItem* MapItem::makeRoot()
 {
-    ObjectInfo o;
-    o.id = obj[ "id" ].toDouble( 0 );
-    o.line = obj[ "line" ].toInt( 0 );
-    o.name = obj[ "name" ].toString( "" );
-    o.info = obj[ "info" ].toString( "" );
-    MinimapObject* parsedItem = parent->addChild( o );
+    return new MapItem("", 0);
+}
 
-    auto children = obj[ "children" ].toArray();
-    for ( int i = 0; i < children.count(); i++ ) {
-        parseJsonObject( children.at( i ).toObject(), parsedItem );
+MapItem ::~MapItem()
+{
+    for (auto x : children_)
+    {
+        delete x;
+    }
+    children_.clear();
+}
+int MapItem::childCount()
+{
+    return children_.size();
+}
+
+MapItem* MapItem::add(const string& name, uint64_t id )
+{
+    auto item = new MapItem(name, id);
+
+    children_.push_back(item);
+    return item;
+
+   
+}
+
+const string& MapItem::name() const
+{
+    return name_;
+}
+
+uint64_t MapItem::id() const
+{
+    return id_;
+}
+
+const list<MapItem*> MapItem::children() const
+{
+    return children_;
+}
+
+MapItem::MapItem( const string& name, uint64_t id )
+    : children_(), name_(name), id_(id) {}
+
+
+PYBIND11_EMBEDDED_MODULE(logmap, m)
+{
+
+    py::class_<MapItem>(m, "MapItem")
+        .def_static("make", &MapItem::makeRoot, py::return_value_policy::reference)
+        .def("add", &MapItem::add, py::return_value_policy::reference)
+        .def("__repr__", [](MapItem& a) { return "MapItem(named='" + a.name() + "',id=" + to_string(a.id()) + ")"; });
+}
+
+////////////////////////////////////////////////////
+////// DecodedLog ////////////////////////////////
+////////////////////////////////////////////////////
+struct GlobalPyCtx
+{
+    GlobalPyCtx()
+    {
+        py::initialize_interpreter();
+        pyKlog = py::module::import("klogg");
+    }
+    ~GlobalPyCtx()
+    {
+        pyKlog = py::none();
+        py::finalize_interpreter();
+    }
+
+    py::module pyKlog;
+
+};
+
+struct LogPyCtx
+{
+    LogPyCtx(shared_ptr<GlobalPyCtx> gpc) : globalPyCtx(gpc){}
+    shared_ptr<GlobalPyCtx> globalPyCtx;
+    py::object pyLog;
+};
+
+shared_ptr<GlobalPyCtx> gPyCtx;
+
+#define PY_LOG_CTX  ((LogPyCtx*)ctx_)
+#define PY_GLB_CTX  (PY_LOG_CTX->globalPyCtx)
+#define PY_KLOGG    (PY_GLB_CTX->pyKlog)
+#define PY_TRY      try
+#define PY_CATCH    catch (exception& e){ qCritical() << "exception " << e.what(); LOG(logERROR) << "exception " << e.what();}catch(...) {LOG(logERROR) << "DecodedLog Failed";}
+#define PY_CHECK_LOG_CTX()  if(ctx_== nullptr) throw exception("Log context is empty")
+
+void DecodedLog::init()
+{
+    if (gPyCtx == nullptr)
+    {
+        gPyCtx = make_shared<GlobalPyCtx>();
     }
 }
 
-MinimapObject* MinimapObject::loadJson( QString path )
+DecodedLog::DecodedLog( const QString& logFileName )
+    : fileName_( logFileName )
+    , isDecoded_( false )
+    , initMapLock_()
+    , cahceFileName_(logFileName + ".info")
+    , ctx_(nullptr)
 {
-    QFile infoFile( path );
-    MinimapObject* root = new MinimapObject();
+    PY_TRY{
+        init();
+        ctx_ = new LogPyCtx(gPyCtx);
 
-    if ( !infoFile.open( QIODevice::ReadOnly ) ) {
-        return root;
+        PY_LOG_CTX->pyLog = PY_KLOGG.attr("DecodedLog")(logFileName.toStdString());
+    } PY_CATCH;
+}
+
+
+DecodedLog::~DecodedLog() 
+{
+    if (ctx_)
+    {
+        delete ctx_;
     }
+}
 
-    QByteArray data = infoFile.readAll();
+bool DecodedLog::IsMapInitialized()
+{
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+        return PY_LOG_CTX->pyLog.attr("is_map_initialized")().cast<bool>();
+    }PY_CATCH;
+}
 
-    QJsonDocument loadDoc( QJsonDocument::fromJson( data ) );
-    bool success = false;
+void DecodedLog::generateCache() {
+    // call python
+}
 
-    auto children = loadDoc.array();
-    for ( int i = 0; i < children.count(); i++ ) {
-        parseJsonObject( children.at( i ).toObject(), root );
+void DecodedLog::loadCache()
+{
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+    }PY_CATCH;
+}
+
+void DecodedLog::loadCacheDone( bool success )
+{
+    initMapLock_.unlock();
+    emit InitMapComplete( success );
+}
+
+void DecodedLog::generateCacheDone( bool success )
+{
+    loadCache();
+}
+
+void DecodedLog::InitializeMap()
+{
+    if ( !initMapLock_.try_lock() ) {
+        LOG( logERROR ) << "already initializing map";
+        return;
     }
-
-    return root;
+    generateCache();
 }
 
-MinimapObject::MinimapObject( ObjectInfo& data, MinimapObject* parent )
-    : _data( data )
-    , _parent( parent )
+
+
+QString DecodedLog::DecodeLine( const QString& logLine )
 {
-}
-MinimapObject::MinimapObject()
-    : _data()
-    , _parent( nullptr )
-{
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+    }PY_CATCH;
+
 }
 
-MinimapObject::~MinimapObject()
+QString DecodedLog::DecodeItem( uint64_t id )
 {
-    qDeleteAll( _children );
+    return QString::fromStdString(PY_LOG_CTX->pyLog.attr("decode_map_item")(id).cast<string>());
 }
 
-int MinimapObject::count() const
+QStringList DecodedLog::GetMapTypes()
 {
-    return _children.count();
+    QStringList types;
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+        auto stdTypes = PY_LOG_CTX->pyLog.attr("get_map_types")().cast<list<string>>();
+        for (auto t : stdTypes)
+        {
+            types << QString::fromStdString(t);
+        }
+        return types;
+    }PY_CATCH;
+
+    return types;
 }
 
-MinimapObject* MinimapObject::getChild( int i ) const
+MapTree DecodedLog::GetMap(const QString& type)
 {
-    if ( i < 0 || i >= _children.count() ) {
-        return nullptr;
-    }
-    return _children.at( i );
-}
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+        auto root = PY_LOG_CTX->pyLog.attr("get_map")(type.toStdString()).cast<MapItem*>();
+        LOG(logINFO) << "Created new map:" << root << " Log:" << this;
+        return MapTree(root, [this](MapItem* ptr) { LOG(logINFO) << "Deleted map:" << ptr << " Log:" << this; });
+    }PY_CATCH;
 
-MinimapObject* MinimapObject::getParent() const
-{
-    return _parent;
-}
-
-ObjectInfo* MinimapObject::getData()
-{
-    return &_data;
-}
-
-MinimapObject* MinimapObject::addChild( ObjectInfo& data, int index )
-{
-    auto child = new MinimapObject( data, this );
-    if ( index < 0 ) {
-        _children.append( child );
-    }
-    else {
-        _children.insert( index, child );
-    }
-    return child;
+    return MapTree(nullptr);
 }

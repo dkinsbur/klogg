@@ -73,6 +73,7 @@ add_library(ui STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/minimap.cpp
 )
 
+
 set_target_properties(ui PROPERTIES AUTOUIC ON)
 set_target_properties(ui PROPERTIES AUTOMOC ON)
 
@@ -83,6 +84,10 @@ endif()
 
 target_include_directories(ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(ui PUBLIC Qt5::Widgets Qt5::Xml logdata versioncheck absl::any)
+
+target_include_directories(ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/python36")
+target_link_directories(ui PUBLIC "${CMAKE_SOURCE_DIR}/3rdparty/python36")
 
 add_dependencies(ui generate_version)
 

@@ -410,7 +410,7 @@ class Configuration final : public Persistable<Configuration> {
     bool enableLogging_ = false;
     uint8_t loggingLevel_ = 4;
 
-    bool enableVersionChecking_ = true;
+    bool enableVersionChecking_ = false;
 
     bool extractArchives_ = true;
     bool extractArchivesAlways_ = false;

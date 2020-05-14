@@ -119,10 +119,10 @@ class KloggApp : public SingleApplication {
 
     void initLogger( plog::Severity log_level, bool log_to_file )
     {
-        QString log_file_name
-            = QString( "klogg_%1_%2.log" )
-                  .arg( QDateTime::currentDateTime().toString( "yyyy-MM-dd_HH-mm-ss" ) )
-                  .arg( applicationPid() );
+        QString log_file_name = QString( "klogg__.log" );
+            //= QString( "klogg_%1_%2.log" )
+            //      .arg( QDateTime::currentDateTime().toString( "yyyy-MM-dd_HH-mm-ss" ) )
+            //      .arg( applicationPid() );
 
         tempAppender_ = std::make_unique<plog::RollingFileAppender<plog::GloggFormatter>>(
             QDir::temp().filePath( log_file_name ).toStdString().c_str(), 10 * 1024 * 1024, 5 );

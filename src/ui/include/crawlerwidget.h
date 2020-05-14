@@ -56,10 +56,10 @@
 #include "data/logfiltereddata.h"
 #include "filteredview.h"
 #include "logmainview.h"
+#include "minimap.h"
 #include "overview.h"
 #include "signalmux.h"
 #include "viewinterface.h"
-#include "minimap.h"
 
 class InfoLine;
 class QuickFindPattern;
@@ -118,10 +118,25 @@ class CrawlerWidget : public QSplitter,
 
   public:
     template <class T> struct access_by;
-    MinimapObject* minimap() const
+    MapItem* minimap() const
     {
         return minimap_;
     }
+
+private:
+    QString logFileName_;
+
+public:
+    void setLogFileName( const QString& fileName )
+    {
+        logFileName_ = fileName;
+    }
+
+    QString& logFileName()
+    {
+        return logFileName_;
+    }
+
 
   protected:
     // Implementation of the ViewInterface functions
@@ -142,8 +157,7 @@ class CrawlerWidget : public QSplitter,
 
     void keyPressEvent( QKeyEvent* keyEvent ) override;
 
-signals:
-    void newSelection( LineNumber line );
+  signals:
     // Sent to signal the client load has progressed,
     // passing the completion percentage.
     void loadingProgressed( int progress );
@@ -166,13 +180,23 @@ signals:
     // available) has changed
     void dataStatusChanged( DataStatus status );
 
-    void newSelectedLineString( QString string );
+    void newLineSelected( LineNumber line, QString& text );
 
-    public slots:
+  public slots:
     // Called when a new line has been selected in the filtered view,
     // to instruct the main view to jump to the matching line.
     void jumpToMatchingLine( LineNumber filteredLineNb );
-    void jumpToMatchingLine2( LineNumber filteredLineNb );
+
+  public:
+    void setSelectedLine(LineNumber line) 
+    {
+          logMainView->selectAndDisplayLine(line);
+    }
+
+    QString& getLineString( LineNumber line )
+    {
+        return activeView()->getLineString( line );
+    }
 
   private slots:
     // Instructs the widget to start a search using the current search line.
@@ -301,7 +325,7 @@ signals:
     QToolButton* useRegexpButton;
     QToolButton* searchRefreshButton;
     OverviewWidget* overviewWidget_;
-    MinimapObject* minimap_;
+    MapItem* minimap_;
 
     // Default palette to be remembered
     QPalette searchInfoLineDefaultPalette;

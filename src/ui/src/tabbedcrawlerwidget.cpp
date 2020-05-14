@@ -68,6 +68,19 @@ TabbedCrawlerWidget::TabbedCrawlerWidget()
     myTabBar_.setContextMenuPolicy( Qt::CustomContextMenu );
     connect( &myTabBar_, &QWidget::customContextMenuRequested, this,
              &TabbedCrawlerWidget::showContextMenu );
+
+    connect( this, &TabbedCrawlerWidget::currentChanged, 
+        [this]( int index ) { emit logViewSwitched( static_cast<CrawlerWidget*>( widget( index ) ) );} 
+    );
+}
+
+void TabbedCrawlerWidget::tabInserted( int index )
+{
+    QTabWidget::tabInserted( index );
+}
+void TabbedCrawlerWidget::tabRemoved( int index )
+{
+    QTabWidget::tabRemoved( index );
 }
 
 void TabbedCrawlerWidget::addTabBarItem( int index, const QString& file_name )
@@ -94,6 +107,9 @@ void TabbedCrawlerWidget::addTabBarItem( int index, const QString& file_name )
 
 void TabbedCrawlerWidget::removeCrawler( int index )
 {
+    // qInfo() << "removed crawler:" << index << myTabBar_.tabData( index ).toString();
+    emit logViewClosed( static_cast<CrawlerWidget*>( this->widget( index ) ) );
+
     QTabWidget::removeTab( index );
 
     if ( count() <= 1 )

@@ -20,31 +20,118 @@
 #ifndef MINIMAP_H
 #define MINIMAP_H
 
+#include <QMutex>
+#include <QProcess>
+#include <QString>
+#include <memory>
+using namespace std;
 
-struct ObjectInfo {
-    QString name;
-    QString info;
-    uint32_t line;
-    uint64_t id;
-};
-Q_DECLARE_METATYPE( ObjectInfo* )
 
-class MinimapObject {
+class MapItem {
   public:
-    static MinimapObject* loadJson( QString path );
+    static MapItem* makeRoot();
+    ~MapItem();
 
-    MinimapObject( ObjectInfo& data, MinimapObject* parent );
-    MinimapObject();
-    ~MinimapObject();
-    int count() const;
-    MinimapObject* getChild( int i ) const;
-    MinimapObject* getParent() const;
-    ObjectInfo* getData();
-    MinimapObject* addChild( ObjectInfo& data, int index = -1 );
+    int childCount();
+
+    MapItem* add(const string& name, uint64_t id );
+
+    const string& name() const;
+    uint64_t id() const;
+    const list<MapItem*> children() const;
 
   private:
-    QVector<MinimapObject*> _children;
-    ObjectInfo _data;
-    MinimapObject* _parent;
+      MapItem(const string& name, uint64_t id);
+      list<MapItem*> children_;
+
+    uint64_t id_;
+    string name_;
+
 };
+
+
+//struct MapTreeItem
+//{
+//public:
+//    static MapTreeItem* make() { return new MapTreeItem("", 0); }
+//    MapTreeItem* add(const string& name, uint64_t id)
+//    {
+//        auto item = new MapTreeItem(name, id);
+//
+//        children_.push_back(item);
+//        return item;
+//    }
+//    uint64_t id() { return id_; } const
+//        const string& name() { return name_; }
+//    const list< MapTreeItem*> children()
+//    {
+//        return children_;
+//    }
+//    MapTreeItem(const string& name, uint64_t id) :name_(name), id_(id) {}
+//    ~MapTreeItem()
+//    {
+//        for (auto x : children_)
+//        {
+//            delete x;
+//        }
+//        children_.clear();
+//    }
+//private:
+//
+//    uint64_t id_;
+//    string name_;
+//    list<MapTreeItem*> children_;
+//
+//};
+
+//struct ItemInfo {
+//    uint64_t id;
+//    QString name;
+//    int type;
+//    QString info;
+//};
+
+typedef shared_ptr<MapItem> MapTree;
+
+class DecodedLog : public QObject {
+
+    Q_OBJECT
+
+  public:
+    static void init();
+    DecodedLog( const QString& logFileName );
+    ~DecodedLog();
+
+    // minimap
+    void InitializeMap();
+    void InitializeMapFromCache();
+    bool IsMapInitialized();
+
+    QString DecodeLine( const QString& logLine );
+    QString DecodeItem( uint64_t id );
+    QStringList GetMapTypes();
+    MapTree GetMap(const QString& mapType );
+
+  signals:
+    void InitMapComplete( bool success );
+    void DecodeLineComplete( bool success, QString& info );
+    void DecodeItemComplete( bool success, QString& info );
+
+  private:
+    void loadCache();
+    void generateCache();
+    void loadCacheDone( bool success );
+    void generateCacheDone( bool success );
+
+    QString fileName_;
+    QString cahceFileName_;
+    bool isDecoded_;
+    QMutex initMapLock_;
+    QProcess process_;
+    QMap<uint64_t, void*> itemInfo_;
+
+    void* ctx_;
+
+};
+
 #endif

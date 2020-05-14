@@ -98,6 +98,7 @@ void signalCrawlerToFollowFile( CrawlerWidget* crawler_widget )
 
 } // namespace
 
+#include <QMessageBox>
 MainWindow::MainWindow( WindowSession session )
     : session_( std::move( session ) )
     , mainIcon_()
@@ -169,24 +170,21 @@ MainWindow::MainWindow( WindowSession session )
     connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, this,
              &MainWindow::currentTabChanged );
 
-    connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, [this]( int index ) {
-        if ( index > -1 ) {
-            auto* crawler_widget = static_cast<CrawlerWidget*>( mainTabWidget_.widget( index ) );
-            decodeWidget_.updatedMinimap( crawler_widget->minimap() );
+    auto decoder = &decodeWidget_.getDecodeManager();
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewOpened, decoder, &DecodeManager::openLogDecoder, Qt::QueuedConnection );
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewClosed, decoder, &DecodeManager::closeLogDecoder, Qt::QueuedConnection);
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewSwitched, decoder, &DecodeManager::switchCurrentLogDecoder, Qt::QueuedConnection);
+
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::newLineSelected, &decodeWidget_.getDecodeManager(), &DecodeManager::decodeLine );
+    
+    connect(&decodeWidget_.getDecodeManager(), &DecodeManager::foundMatchingLine, [this](LineNumber line) {
+        auto crawler = (CrawlerWidget*)mainTabWidget_.currentWidget(); if (crawler != nullptr)
+        {
+            crawler->setSelectedLine(line);
         }
-    } );
+    });
 
-    connect( &mainTabWidget_, &TabbedCrawlerWidget::updateLineString, &decodeWidget_,
-             &DecodeDockWidget::updateTextHandler );
-
-    connect( &decodeWidget_, &DecodeDockWidget::MinimapObjectChanged, [this]( int line ) {
-        auto widg = (CrawlerWidget*)mainTabWidget_.currentWidget();
-        if ( widg != NULL ) {
-
-            widg->jumpToMatchingLine2( LineNumber( line ) );
-        }
-    } );
-
+    
     // Establish the QuickFindWidget and mux ( to send requests from the
     // QFWidget to the right window )
     connect( &quickFindWidget_, SIGNAL( patternConfirmed( const QString&, bool ) ), &quickFindMux_,
@@ -208,7 +206,7 @@ MainWindow::MainWindow( WindowSession session )
     connect( &quickFindMux_, SIGNAL( clearNotification() ), &quickFindWidget_,
              SLOT( clearNotification() ) );
 
-    connect( this, SIGNAL( optionsChanged() ), &decodeWidget_, SLOT( applyOptions() ) );
+//    connect( this, SIGNAL( optionsChanged() ), &decodeWidget_, SLOT( applyOptions() ) );
 
     // Construct the QuickFind bar
     quickFindWidget_.hide();
@@ -223,7 +221,6 @@ MainWindow::MainWindow( WindowSession session )
     decodeWidget_.setAllowedAreas( Qt::AllDockWidgetAreas );
     decodeWidget_.setObjectName( "DockWindow" );
     addDockWidget( Qt::LeftDockWidgetArea, &decodeWidget_ );
-
 
     setCentralWidget( central_widget );
 
