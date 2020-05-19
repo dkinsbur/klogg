@@ -23,6 +23,8 @@
 #include <QMutex>
 #include <QProcess>
 #include <QString>
+#include <QTimer>
+#include <QThread>
 #include <memory>
 using namespace std;
 
@@ -49,47 +51,7 @@ class MapItem {
 
 };
 
-
-//struct MapTreeItem
-//{
-//public:
-//    static MapTreeItem* make() { return new MapTreeItem("", 0); }
-//    MapTreeItem* add(const string& name, uint64_t id)
-//    {
-//        auto item = new MapTreeItem(name, id);
-//
-//        children_.push_back(item);
-//        return item;
-//    }
-//    uint64_t id() { return id_; } const
-//        const string& name() { return name_; }
-//    const list< MapTreeItem*> children()
-//    {
-//        return children_;
-//    }
-//    MapTreeItem(const string& name, uint64_t id) :name_(name), id_(id) {}
-//    ~MapTreeItem()
-//    {
-//        for (auto x : children_)
-//        {
-//            delete x;
-//        }
-//        children_.clear();
-//    }
-//private:
-//
-//    uint64_t id_;
-//    string name_;
-//    list<MapTreeItem*> children_;
-//
-//};
-
-//struct ItemInfo {
-//    uint64_t id;
-//    QString name;
-//    int type;
-//    QString info;
-//};
+class DecodeWorker;
 
 typedef shared_ptr<MapItem> MapTree;
 
@@ -97,41 +59,57 @@ class DecodedLog : public QObject {
 
     Q_OBJECT
 
+        friend DecodeWorker;
   public:
     static void init();
     DecodedLog( const QString& logFileName );
     ~DecodedLog();
 
+    QString logFileName();
+
     // minimap
-    void InitializeMap();
-    void InitializeMapFromCache();
-    bool IsMapInitialized();
+    void Decode();
+    void DecodeAbort();
+    bool IsDecoded();
 
     QString DecodeLine( const QString& logLine );
     QString DecodeItem( uint64_t id );
+    QList<uint32_t> ItemLines( uint64_t id );
     QStringList GetMapTypes();
     MapTree GetMap(const QString& mapType );
 
   signals:
-    void InitMapComplete( bool success );
-    void DecodeLineComplete( bool success, QString& info );
-    void DecodeItemComplete( bool success, QString& info );
+    void DecodeComplete( bool success );
+    void DecodeProgressUpdated(int progress);
 
-  private:
-    void loadCache();
-    void generateCache();
-    void loadCacheDone( bool success );
-    void generateCacheDone( bool success );
-
+private slots:
+    void CleanupWorker();
+private:
+    void checkProgress();
     QString fileName_;
     QString cahceFileName_;
     bool isDecoded_;
     QMutex initMapLock_;
     QProcess process_;
     QMap<uint64_t, void*> itemInfo_;
-
     void* ctx_;
+private:
+    DecodeWorker* worker_;
+    //QTimer timer_;
+
 
 };
+
+class DecodeWorker : public QThread
+{
+    Q_OBJECT
+public:
+    DecodeWorker(DecodedLog* dl) : dl_(dl) {}
+private:
+    DecodedLog* dl_;
+protected:
+    void run();
+};
+
 
 #endif

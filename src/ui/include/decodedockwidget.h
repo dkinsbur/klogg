@@ -30,6 +30,7 @@
 #include <QStatusBar>
 #include <QTextBrowser>
 #include <QTreeWidget>
+#include <QProgressBar>
 
 
 
@@ -39,7 +40,11 @@
 
 struct DecodedWidgetState
 {
-    QString         info;
+    int             progress;
+    bool            decoded;
+    LineNumber      line;
+    QString         itemInfo;
+    QString         lineInfo;
     QStringList     mapTypes;
     QString         mapType;
     uint64_t        mapItem;
@@ -58,10 +63,16 @@ class DecodeManager : public QObject {
     void closeLogDecoder( CrawlerWidget* logView );
     void switchCurrentLogDecoder( CrawlerWidget* logView );
 
-    void parseLog(){}
-    void decodeLine( LineNumber lineNumber, QString& lineText ){}
+    void decodeLog();
+    void decodeLogAbort();
+
+    void decodeLine(LineNumber lineNumber, QString lineText);
     void decodeMapItem(uint64_t itemId);
     void generateLogMap(const QString& mapType);
+    void openLink(const QUrl&);
+    
+    void updateDecodeLogProgress(int progress);
+    void updateDecodeComplete(bool success);
 
   signals:
     void logDecoderOpened(void* handle);
@@ -72,18 +83,16 @@ class DecodeManager : public QObject {
     void lineDecoded( QString& info );
 
 
-    void parseProgressChanged( int proress );
-    void parseLogCompleted( bool succeeded );
+    void decodeLogProgressChanged( int proress );
+    void decodeLogCompleted( bool succeeded );
     
-    // this signal is triggered to notify the decode widget that a new map item should be selected
-    void foundMatchingMapItem(uint64_t itemId);
-
     // this signal is triggered to notify the log view that a new line in the log should be selected 
     void foundMatchingLine(LineNumber lineNumber);
 
     void logMapGenerated();
 
   private:
+      bool getCurrents(shared_ptr<DecodedWidgetState>* state, shared_ptr<DecodedLog>* dl);
     QMap<void*, shared_ptr<DecodedWidgetState>> states_;
     QMap<void*, shared_ptr<DecodedLog>> logs_;
 
@@ -96,27 +105,20 @@ class DecodeDockWidget : public QDockWidget
 {
     Q_OBJECT
 
-public:
-    void handleLineSelectionChanged(LineNumber line);
-    void handleLinkClick(QString& link);
-    void handleForwardBackwardsClick(bool forward);
-    void handleDecodeClick();
-
-    DecodeManager& getDecodeManager();
 
 signals:
     void selectedMapItemChanged(uint64_t id);
+    bool decodeRequested();
+    
 public slots:
     void reloadWidgetState(shared_ptr<DecodedWidgetState>);
 
-    void handleMinimapTypeChange(int index);
-    void handleMinimapSelectionChange(QTreeWidgetItem* current, QTreeWidgetItem* previous);
+    private slots:
+        void checkDoDecode();
 
 private:
 
     void updateCurrLog(CrawlerWidget* log);
-    void updateMapType(QString& mapType);
-
     void updateUI(int updateType);
     void updateMap(MapTree root);
     void updateUISelectedItem(uint64_t item);
@@ -127,6 +129,7 @@ private:
 public:
     DecodeDockWidget();
     ~DecodeDockWidget();
+    DecodeManager& getDecodeManager();
 
 private slots:
     void applyOptions();
@@ -137,6 +140,7 @@ private:
     QComboBox minimapTypeCombo_;
     QTreeWidget minimapTree_;
     QTextBrowser decodedTextBox_;
+    QWidget historyLayoutWidget_;
     QHBoxLayout historyLayout_;
     QPushButton historyForwardBtn_;
     QPushButton historyBackwardsBtn_;
@@ -145,6 +149,7 @@ private:
     DecodeManager decMgr_;
     QThread decMgrTh_;
     DecodedWidgetState currState_;
+    QProgressBar decodeProgressBar_;
 
     // void AddLogObject( MinimapObject* object, QTreeWidget* parent );
     // void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );

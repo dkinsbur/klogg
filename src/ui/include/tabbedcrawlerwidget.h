@@ -68,7 +68,7 @@ class TabbedCrawlerWidget : public QTabWidget
       void logViewOpened( CrawlerWidget* crawler );
       void logViewClosed( CrawlerWidget* crawler );
       void logViewSwitched( CrawlerWidget* crawler );
-      void newLineSelected(LineNumber line, QString& text);
+      void newLineSelected(LineNumber line, QString text);
 
 
     protected:

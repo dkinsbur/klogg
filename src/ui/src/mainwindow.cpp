@@ -170,10 +170,9 @@ MainWindow::MainWindow( WindowSession session )
     connect( &mainTabWidget_, &TabbedCrawlerWidget::currentChanged, this,
              &MainWindow::currentTabChanged );
 
-    auto decoder = &decodeWidget_.getDecodeManager();
-    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewOpened, decoder, &DecodeManager::openLogDecoder, Qt::QueuedConnection );
-    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewClosed, decoder, &DecodeManager::closeLogDecoder, Qt::QueuedConnection);
-    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewSwitched, decoder, &DecodeManager::switchCurrentLogDecoder, Qt::QueuedConnection);
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewOpened, &decodeWidget_.getDecodeManager(), &DecodeManager::openLogDecoder, Qt::QueuedConnection );
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewClosed, &decodeWidget_.getDecodeManager(), &DecodeManager::closeLogDecoder, Qt::QueuedConnection);
+    connect( &mainTabWidget_, &TabbedCrawlerWidget::logViewSwitched, &decodeWidget_.getDecodeManager(), &DecodeManager::switchCurrentLogDecoder, Qt::QueuedConnection);
 
     connect( &mainTabWidget_, &TabbedCrawlerWidget::newLineSelected, &decodeWidget_.getDecodeManager(), &DecodeManager::decodeLine );
     
@@ -206,7 +205,7 @@ MainWindow::MainWindow( WindowSession session )
     connect( &quickFindMux_, SIGNAL( clearNotification() ), &quickFindWidget_,
              SLOT( clearNotification() ) );
 
-//    connect( this, SIGNAL( optionsChanged() ), &decodeWidget_, SLOT( applyOptions() ) );
+    connect( this, SIGNAL( optionsChanged() ), &decodeWidget_, SLOT( applyOptions() ) );
 
     // Construct the QuickFind bar
     quickFindWidget_.hide();

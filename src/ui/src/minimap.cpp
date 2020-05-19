@@ -20,10 +20,8 @@
 //#include "log.h"
 #include <pybind11/stl.h>
 #include <pybind11/embed.h>
+#include <pybind11/functional.h>
 #include <QFile.h>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <qdebug.h>
 #include "minimap.h"
 #include "log.h"
@@ -89,6 +87,7 @@ PYBIND11_EMBEDDED_MODULE(logmap, m)
 ////////////////////////////////////////////////////
 ////// DecodedLog ////////////////////////////////
 ////////////////////////////////////////////////////
+
 struct GlobalPyCtx
 {
     GlobalPyCtx()
@@ -115,12 +114,37 @@ struct LogPyCtx
 
 shared_ptr<GlobalPyCtx> gPyCtx;
 
-#define PY_LOG_CTX  ((LogPyCtx*)ctx_)
-#define PY_GLB_CTX  (PY_LOG_CTX->globalPyCtx)
-#define PY_KLOGG    (PY_GLB_CTX->pyKlog)
-#define PY_TRY      try
-#define PY_CATCH    catch (exception& e){ qCritical() << "exception " << e.what(); LOG(logERROR) << "exception " << e.what();}catch(...) {LOG(logERROR) << "DecodedLog Failed";}
-#define PY_CHECK_LOG_CTX()  if(ctx_== nullptr) throw exception("Log context is empty")
+#define PY_LOG_CTX_(ctx)        ((LogPyCtx*)ctx)
+#define PY_LOG_CTX              PY_LOG_CTX_(ctx_)
+#define PY_GLB_CTX              (PY_LOG_CTX->globalPyCtx)
+#define PY_KLOGG                (PY_GLB_CTX->pyKlog)
+#define PY_TRY                  try
+#define PY_CATCH                catch (exception& e){ qCritical() << "exception " << e.what(); LOG(logERROR) << "exception " << e.what();}catch(...) {LOG(logERROR) << "DecodedLog Failed";}
+#define PY_CHECK_LOG_CTX_(ctx)  if((ctx)== nullptr) throw exception("Log context is empty")
+#define PY_CHECK_LOG_CTX()      PY_CHECK_LOG_CTX_(ctx_)
+
+#define PY_DL_INIT                      "DecodedLog"
+#define PY_DL_IS_DECODED                "is_decoded"
+#define PY_DL_DECODE                    "decode"
+#define PY_DL_DECODE_ABORT              "decode_abort"
+#define PY_DL_GET_DECODE_PROGRESS       "get_decode_progress"
+#define PY_DL_GET_MAP_TYPES             "get_map_types"
+#define PY_DL_GET_MAP                   "get_map"
+#define PY_DL_GET_MAP_ITEM_LOG_LINES    "get_map_item_log_lines"
+#define PY_DL_DECODE_MAP_ITEM           "decode_map_item"
+#define PY_DL_DECODE_LINE               "decode_line"
+
+void DecodeWorker::run()
+{
+    
+    bool success = false;
+    PY_TRY{
+        PY_CHECK_LOG_CTX_(dl_->ctx_);
+        success = PY_LOG_CTX_(dl_->ctx_)->pyLog.attr(PY_DL_DECODE)().cast<bool>();
+    }PY_CATCH;
+
+    emit dl_->DecodeComplete(success);
+}
 
 void DecodedLog::init()
 {
@@ -136,15 +160,15 @@ DecodedLog::DecodedLog( const QString& logFileName )
     , initMapLock_()
     , cahceFileName_(logFileName + ".info")
     , ctx_(nullptr)
+    , worker_(nullptr)
 {
     PY_TRY{
         init();
         ctx_ = new LogPyCtx(gPyCtx);
-
-        PY_LOG_CTX->pyLog = PY_KLOGG.attr("DecodedLog")(logFileName.toStdString());
+        function<void(int)> progressCallback = [this](int progress) { emit DecodeProgressUpdated(progress); };
+        PY_LOG_CTX->pyLog = PY_KLOGG.attr(PY_DL_INIT)(logFileName.toStdString(), progressCallback);
     } PY_CATCH;
 }
-
 
 DecodedLog::~DecodedLog() 
 {
@@ -154,58 +178,112 @@ DecodedLog::~DecodedLog()
     }
 }
 
-bool DecodedLog::IsMapInitialized()
+QString DecodedLog::logFileName()
+{
+    return fileName_;
+}
+
+bool DecodedLog::IsDecoded()
 {
     PY_TRY{
         PY_CHECK_LOG_CTX();
-        return PY_LOG_CTX->pyLog.attr("is_map_initialized")().cast<bool>();
+        return PY_LOG_CTX->pyLog.attr(PY_DL_IS_DECODED)().cast<bool>();
     }PY_CATCH;
+
+    return false;
 }
 
-void DecodedLog::generateCache() {
-    // call python
-}
-
-void DecodedLog::loadCache()
-{
-    PY_TRY{
-        PY_CHECK_LOG_CTX();
-    }PY_CATCH;
-}
-
-void DecodedLog::loadCacheDone( bool success )
-{
-    initMapLock_.unlock();
-    emit InitMapComplete( success );
-}
-
-void DecodedLog::generateCacheDone( bool success )
-{
-    loadCache();
-}
-
-void DecodedLog::InitializeMap()
+void DecodedLog::Decode()
 {
     if ( !initMapLock_.try_lock() ) {
         LOG( logERROR ) << "already initializing map";
         return;
     }
-    generateCache();
+
+    //timer_.setInterval(500);
+    //connect(&timer_, &QTimer::timeout, [this]()
+    //{
+    //    LOG(logERROR) << "timer" << this << " " << QThread::currentThread() << " " << this->thread();
+    //});// &DecodedLog::checkProgress);
+    //timer_.start(500);
+
+    worker_ = new DecodeWorker(this);
+    connect(worker_, &QThread::finished, this, &DecodedLog::CleanupWorker);
+    worker_->start();
+
 }
 
+void DecodedLog::CleanupWorker()
+{
+    // cleanup timer
+    //timer_.stop();
+
+    disconnect(worker_, &QThread::finished, this, &DecodedLog::CleanupWorker);
+    delete worker_;
+    worker_ = nullptr;
+    initMapLock_.unlock();
+}
+void DecodedLog::checkProgress()
+{
+    LOG(logINFO) << "checknig progress";
+    int progress = -1;
+
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+        progress = PY_LOG_CTX->pyLog.attr(PY_DL_GET_DECODE_PROGRESS)().cast<int>();
+    }PY_CATCH;
+
+    LOG(logINFO) << "progress: " << progress;
+    emit DecodeProgressUpdated(progress);
+}
+
+void DecodedLog::DecodeAbort()
+{
+    LOG(logINFO) << "Aborting Decode";
+
+    if (initMapLock_.tryLock())
+    {
+        LOG(logINFO) << "Currently not decoding";
+        initMapLock_.unlock();
+        return;
+    }
+    
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+        PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_ABORT)().cast<bool>();
+    }PY_CATCH;
+
+}
 
 
 QString DecodedLog::DecodeLine( const QString& logLine )
 {
     PY_TRY{
         PY_CHECK_LOG_CTX();
+        return QString::fromStdString(PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_LINE)(logLine.toStdString()).cast<string>());
     }PY_CATCH;
-
+    return "";
 }
 
 QString DecodedLog::DecodeItem( uint64_t id )
 {
-    return QString::fromStdString(PY_LOG_CTX->pyLog.attr("decode_map_item")(id).cast<string>());
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+       return QString::fromStdString(PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_MAP_ITEM)(id).cast<string>());
+    }PY_CATCH;
+
+    return "";
+}
+
+QList<uint32_t> DecodedLog::ItemLines(uint64_t id)
+{
+    PY_TRY{
+        PY_CHECK_LOG_CTX();
+       return QList<uint32_t>::fromStdList(PY_LOG_CTX->pyLog.attr(PY_DL_GET_MAP_ITEM_LOG_LINES)(id).cast<list<uint32_t>>());
+    }PY_CATCH;
+
+    return QList<uint32_t>();
+    
 }
 
 QStringList DecodedLog::GetMapTypes()
@@ -213,7 +291,7 @@ QStringList DecodedLog::GetMapTypes()
     QStringList types;
     PY_TRY{
         PY_CHECK_LOG_CTX();
-        auto stdTypes = PY_LOG_CTX->pyLog.attr("get_map_types")().cast<list<string>>();
+        auto stdTypes = PY_LOG_CTX->pyLog.attr(PY_DL_GET_MAP_TYPES)().cast<list<string>>();
         for (auto t : stdTypes)
         {
             types << QString::fromStdString(t);
@@ -228,7 +306,7 @@ MapTree DecodedLog::GetMap(const QString& type)
 {
     PY_TRY{
         PY_CHECK_LOG_CTX();
-        auto root = PY_LOG_CTX->pyLog.attr("get_map")(type.toStdString()).cast<MapItem*>();
+        auto root = PY_LOG_CTX->pyLog.attr(PY_DL_GET_MAP)(type.toStdString()).cast<MapItem*>();
         LOG(logINFO) << "Created new map:" << root << " Log:" << this;
         return MapTree(root, [this](MapItem* ptr) { LOG(logINFO) << "Deleted map:" << ptr << " Log:" << this; });
     }PY_CATCH;
