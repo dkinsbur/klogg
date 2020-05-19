@@ -120,7 +120,7 @@ shared_ptr<GlobalPyCtx> gPyCtx;
 #define PY_KLOGG                (PY_GLB_CTX->pyKlog)
 #define PY_TRY                  try
 #define PY_CATCH                catch (exception& e){ qCritical() << "exception " << e.what(); LOG(logERROR) << "exception " << e.what();}catch(...) {LOG(logERROR) << "DecodedLog Failed";}
-#define PY_CHECK_LOG_CTX_(ctx)  if((ctx)== nullptr) throw exception("Log context is empty")
+#define PY_CHECK_LOG_CTX_(ctx)  if((ctx)== nullptr || PY_LOG_CTX_(ctx)->pyLog.ptr() == NULL) throw exception("Log context is empty")
 #define PY_CHECK_LOG_CTX()      PY_CHECK_LOG_CTX_(ctx_)
 
 #define PY_DL_INIT                      "DecodedLog"

@@ -130,7 +130,14 @@ void TabbedCrawlerWidget::mouseReleaseEvent( QMouseEvent* event )
 
     event->ignore();
 }
-
+void TabbedCrawlerWidget::setSelectedLine(LineNumber line)
+{
+    auto crawler = (CrawlerWidget*)currentWidget(); 
+    if (crawler != nullptr)
+    {
+        crawler->setSelectedLine(line);
+    }
+}
 void TabbedCrawlerWidget::showContextMenu( const QPoint& point )
 {
     int tab = myTabBar_.tabAt( point );

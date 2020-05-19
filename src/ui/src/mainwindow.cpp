@@ -176,12 +176,8 @@ MainWindow::MainWindow( WindowSession session )
 
     connect( &mainTabWidget_, &TabbedCrawlerWidget::newLineSelected, &decodeWidget_.getDecodeManager(), &DecodeManager::decodeLine );
     
-    connect(&decodeWidget_.getDecodeManager(), &DecodeManager::foundMatchingLine, [this](LineNumber line) {
-        auto crawler = (CrawlerWidget*)mainTabWidget_.currentWidget(); if (crawler != nullptr)
-        {
-            crawler->setSelectedLine(line);
-        }
-    });
+    connect(&decodeWidget_.getDecodeManager(), &DecodeManager::foundMatchingLine, &mainTabWidget_, &TabbedCrawlerWidget::setSelectedLine,
+        Qt::QueuedConnection);
 
     
     // Establish the QuickFindWidget and mux ( to send requests from the

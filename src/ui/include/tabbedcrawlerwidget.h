@@ -89,6 +89,9 @@ class TabbedCrawlerWidget : public QTabWidget
       const QIcon newfiltered_icon_;
 
       QTabBar myTabBar_;
+
+public slots:
+    void setSelectedLine(LineNumber line);
 };
 
 #endif
