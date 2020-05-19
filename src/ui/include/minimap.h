@@ -20,31 +20,96 @@
 #ifndef MINIMAP_H
 #define MINIMAP_H
 
+#include <QMutex>
+#include <QProcess>
+#include <QString>
+#include <QTimer>
+#include <QThread>
+#include <memory>
+using namespace std;
 
-struct ObjectInfo {
-    QString name;
-    QString info;
-    uint32_t line;
-    uint64_t id;
-};
-Q_DECLARE_METATYPE( ObjectInfo* )
 
-class MinimapObject {
+class MapItem {
   public:
-    static MinimapObject* loadJson( QString path );
+    static MapItem* makeRoot();
+    ~MapItem();
 
-    MinimapObject( ObjectInfo& data, MinimapObject* parent );
-    MinimapObject();
-    ~MinimapObject();
-    int count() const;
-    MinimapObject* getChild( int i ) const;
-    MinimapObject* getParent() const;
-    ObjectInfo* getData();
-    MinimapObject* addChild( ObjectInfo& data, int index = -1 );
+    int childCount();
+
+    MapItem* add(const string& name, uint64_t id );
+
+    const string& name() const;
+    uint64_t id() const;
+    const list<MapItem*> children() const;
 
   private:
-    QVector<MinimapObject*> _children;
-    ObjectInfo _data;
-    MinimapObject* _parent;
+      MapItem(const string& name, uint64_t id);
+      list<MapItem*> children_;
+
+    uint64_t id_;
+    string name_;
+
 };
+
+class DecodeWorker;
+
+typedef shared_ptr<MapItem> MapTree;
+
+class DecodedLog : public QObject {
+
+    Q_OBJECT
+
+        friend DecodeWorker;
+  public:
+    static void init();
+    DecodedLog( const QString& logFileName );
+    ~DecodedLog();
+
+    QString logFileName();
+
+    // minimap
+    void Decode();
+    void DecodeAbort();
+    bool IsDecoded();
+
+    QString DecodeLine( const QString& logLine );
+    QString DecodeItem( uint64_t id );
+    QList<uint32_t> ItemLines( uint64_t id );
+    QStringList GetMapTypes();
+    MapTree GetMap(const QString& mapType );
+
+  signals:
+    void DecodeComplete( bool success );
+    void DecodeProgressUpdated(int progress);
+
+private slots:
+    void CleanupWorker();
+private:
+    void checkProgress();
+    QString fileName_;
+    QString cahceFileName_;
+    bool isDecoded_;
+    QMutex initMapLock_;
+    QProcess process_;
+    QMap<uint64_t, void*> itemInfo_;
+    void* ctx_;
+private:
+    DecodeWorker* worker_;
+    //QTimer timer_;
+
+
+};
+
+class DecodeWorker : public QThread
+{
+    Q_OBJECT
+public:
+    DecodeWorker(DecodedLog* dl) : dl_(dl) {}
+private:
+    DecodedLog* dl_;
+protected:
+    void run();
+};
+
+
 #endif

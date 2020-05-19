@@ -20,48 +20,150 @@
 #ifndef DECODEDOCKWIDGET_H
 #define DECODEDOCKWIDGET_H
 
+#include "crawlerwidget.h"
+#include "minimap.h"
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFontInfo>
+#include <QMap>
 #include <QProcess.h>
+#include <QStatusBar>
 #include <QTextBrowser>
 #include <QTreeWidget>
-#include "minimap.h"
+#include <QProgressBar>
 
-class DecodeDockWidget : public QDockWidget {
+
+
+
+#include <QMutex>
+#include <QThread>
+
+struct DecodedWidgetState
+{
+    int             progress;
+    bool            decoded;
+    LineNumber      line;
+    QString         itemInfo;
+    QString         lineInfo;
+    QStringList     mapTypes;
+    QString         mapType;
+    uint64_t        mapItem;
+    MapTree         map;
+};
+
+class DecodeManager : public QObject {
+
     Q_OBJECT
 
   public:
-    DecodeDockWidget();
-    ~DecodeDockWidget();
-
+      DecodeManager();
+      ~DecodeManager();
   public slots:
-    void updateTextHandler( int index, QString text );
-    void updatedMinimap( MinimapObject* root );
+    void openLogDecoder( CrawlerWidget* logView );
+    void closeLogDecoder( CrawlerWidget* logView );
+    void switchCurrentLogDecoder( CrawlerWidget* logView );
 
-  private slots:
-    void updateProjectHandler( const QString& proj );
-    void applyOptions();
-    void onFinish( int exitCode, QProcess::ExitStatus exitStatus );
+    void decodeLog();
+    void decodeLogAbort();
+
+    void decodeLine(LineNumber lineNumber, QString lineText);
+    void decodeMapItem(uint64_t itemId);
+    void generateLogMap(const QString& mapType);
+    void openLink(const QUrl&);
+    
+    void updateDecodeLogProgress(int progress);
+    void updateDecodeComplete(bool success);
 
   signals:
-    void MinimapObjectChanged( int line );
+    void logDecoderOpened(void* handle);
+    void logDecoderClosed(void* handle);
+    void widgetStateChanged(shared_ptr<DecodedWidgetState> state);
+    void decodeComplete(bool success, QString logName);
+
+
+    void lineDecoded( QString& info );
+
+
+    void decodeLogProgressChanged( int proress );
+    void decodeLogCompleted( bool succeeded );
+    
+    // this signal is triggered to notify the log view that a new line in the log should be selected 
+    void foundMatchingLine(LineNumber lineNumber);
+
+    void logMapGenerated();
 
   private:
+      bool getCurrents(shared_ptr<DecodedWidgetState>* state, shared_ptr<DecodedLog>* dl);
+    QMap<void*, shared_ptr<DecodedWidgetState>> states_;
+    QMap<void*, shared_ptr<DecodedLog>> logs_;
+
+    CrawlerWidget* currLog_;
+    QMutex lock_;
+};
+
+
+class DecodeDockWidget : public QDockWidget
+{
+    Q_OBJECT
+
+
+signals:
+    void selectedMapItemChanged(uint64_t id);
+    bool decodeRequested();
+    
+public slots:
+    void reloadWidgetState(shared_ptr<DecodedWidgetState>);
+
+    private slots:
+        void checkDoDecode();
+
+private:
+
+    void updateCurrLog(CrawlerWidget* log);
+    void updateUI(int updateType);
+    void updateMap(MapTree root);
+    void updateUISelectedItem(uint64_t item);
+
+    void MinimapAddItem(MapItem* object, QTreeWidget* parent);
+    void MinimapAddItem(MapItem* object, QTreeWidgetItem* parent);
+
+public:
+    DecodeDockWidget();
+    ~DecodeDockWidget();
+    DecodeManager& getDecodeManager();
+
+private slots:
+    void applyOptions();
+    void checkDecodeFailure(bool success, QString logName);
+
+private:
+    QWidget mainWidget_;
+    QVBoxLayout mainLayout_;
+    QComboBox minimapTypeCombo_;
+    QTreeWidget minimapTree_;
     QTextBrowser decodedTextBox_;
-    QComboBox comboBox_;
-    QString currStr_;
-    QString parsedLine_;
-    QProcess process_;
-    QTreeWidget tree_;
-    QString minimapInfo_;
+    QWidget historyLayoutWidget_;
+    QHBoxLayout historyLayout_;
+    QPushButton historyForwardBtn_;
+    QPushButton historyBackwardsBtn_;
+    QPushButton decodeBtn_;
+    QStatusBar statusbar_;
+    DecodeManager decMgr_;
+    QThread decMgrTh_;
+    DecodedWidgetState currState_;
+    QProgressBar decodeProgressBar_;
+    QLabel decodeStatusLabel_;
 
-    void AddLogObject( MinimapObject* object, QTreeWidget* parent );
-    void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );
+    // void AddLogObject( MinimapObject* object, QTreeWidget* parent );
+    // void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );
+    //
+    // void parseLine();
+    // void selectTreeItemById( uint64_t id );
+    // void updateMinimapObjectInfo( QString& info );
+    // void updatedHtml();
+    void* stateHandle;
+    QMutex stateLock_;
 
-    void parseLine();
-    void selectTreeItemById( uint64_t id );
-    void updateMinimapObjectInfo( QString& info );
-    void updatedHtml();
+    void setStatusMessage(const QString& text);
 };
 #endif // DECODEDOCKWIDGET_H
