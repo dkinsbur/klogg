@@ -107,6 +107,7 @@ void DecodeManager::updateDecodeComplete(bool success)
     bool stateChanged = false;
     shared_ptr<DecodedWidgetState> state;
     shared_ptr<DecodedLog> dl;
+    QString logName;
 
     auto _sender = sender();
     
@@ -118,6 +119,7 @@ void DecodeManager::updateDecodeComplete(bool success)
         {
             if ((void*)logs_[k].get() == _sender)
             {
+                logName = static_cast<CrawlerWidget*>(k)->logFileName();
                 state = states_[k];
                 dl = logs_[k];
                 state->progress = -1;
@@ -133,6 +135,11 @@ void DecodeManager::updateDecodeComplete(bool success)
                 break;
             }
         }
+    }
+
+    if (!logName.isEmpty())
+    {
+        emit decodeComplete(success, logName);
     }
 
     if (stateChanged)
@@ -445,6 +452,7 @@ DecodeDockWidget::DecodeDockWidget()
     historyLayoutWidget_.setLayout(&historyLayout_);
     mainLayout_.addWidget(&historyLayoutWidget_);
     mainLayout_.addWidget(&statusbar_);
+    statusbar_.addPermanentWidget(&decodeStatusLabel_);
     mainLayout_.setContentsMargins(1, 1, 1, 1);
 
     mainWidget_.setLayout(&mainLayout_);
@@ -499,7 +507,33 @@ DecodeDockWidget::DecodeDockWidget()
         &decMgr_, &DecodeManager::decodeLog,
         Qt::QueuedConnection
     );
+
+    connect(
+        this, &DecodeDockWidget::decodeRequested,
+        &decMgr_, &DecodeManager::decodeLog,
+        Qt::QueuedConnection
+    );
+
+    connect(
+        &decMgr_, &DecodeManager::decodeComplete,
+        this, &DecodeDockWidget::checkDecodeFailure,
+        Qt::QueuedConnection
+    );
+
 }
+
+void DecodeDockWidget::checkDecodeFailure(bool success, QString logName)
+{
+    if (!success)
+    {
+        QMessageBox m;
+        m.setIcon(QMessageBox::Critical);
+        m.setText(QString("Log decoding failed for:\n") + logName);
+        m.exec();
+    }
+}
+
+
 
 DecodeManager& DecodeDockWidget::getDecodeManager()
 {
@@ -565,12 +599,12 @@ void DecodeDockWidget::reloadWidgetState(shared_ptr<DecodedWidgetState> state)
 
     if (currState_.progress <= 0)
     {
-        statusbar_.showMessage(currState_.decoded ? "Log is Decoded" : "Log is NOT decoded");
+        decodeStatusLabel_.setText(currState_.decoded ? "Log is Decoded" : "Log is NOT decoded");
         statusbar_.removeWidget(&decodeProgressBar_);
     }
     else
     {
-        statusbar_.showMessage("Decoding...");
+        decodeStatusLabel_.setText("Log is being decoded");
         statusbar_.addWidget(&decodeProgressBar_);
         decodeProgressBar_.show();
         decodeProgressBar_.setValue(currState_.progress);

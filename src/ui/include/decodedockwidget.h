@@ -78,6 +78,7 @@ class DecodeManager : public QObject {
     void logDecoderOpened(void* handle);
     void logDecoderClosed(void* handle);
     void widgetStateChanged(shared_ptr<DecodedWidgetState> state);
+    void decodeComplete(bool success, QString logName);
 
 
     void lineDecoded( QString& info );
@@ -133,6 +134,7 @@ public:
 
 private slots:
     void applyOptions();
+    void checkDecodeFailure(bool success, QString logName);
 
 private:
     QWidget mainWidget_;
@@ -150,6 +152,7 @@ private:
     QThread decMgrTh_;
     DecodedWidgetState currState_;
     QProgressBar decodeProgressBar_;
+    QLabel decodeStatusLabel_;
 
     // void AddLogObject( MinimapObject* object, QTreeWidget* parent );
     // void AddLogObject( MinimapObject* object, QTreeWidgetItem* parent );
