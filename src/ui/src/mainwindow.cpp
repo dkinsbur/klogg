@@ -795,8 +795,10 @@ void MainWindow::options()
 {
     OptionsDialog dialog( this );
     signalMux_.connect( &dialog, SIGNAL( optionsChanged() ), SLOT( applyConfiguration() ) );
+    connect(&dialog, SIGNAL(optionsChanged() ), &decodeWidget_, SLOT(applyOptions()));
     dialog.exec();
     signalMux_.disconnect( &dialog, SIGNAL( optionsChanged() ), SLOT( applyConfiguration() ) );
+    disconnect(&dialog, SIGNAL(optionsChanged()), &decodeWidget_, SLOT(applyOptions()));
 
     const auto& config = Configuration::get();
     plog::EnableLogging( config.enableLogging(), config.loggingLevel() );

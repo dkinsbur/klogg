@@ -49,6 +49,7 @@ struct DecodedWidgetState
     QString         mapType;
     uint64_t        mapItem;
     MapTree         map;
+    bool            pythonBusy;
 };
 
 class DecodeManager : public QObject {
@@ -73,12 +74,14 @@ class DecodeManager : public QObject {
     
     void updateDecodeLogProgress(int progress);
     void updateDecodeComplete(bool success);
+    void updatePythonBusy();
 
   signals:
     void logDecoderOpened(void* handle);
     void logDecoderClosed(void* handle);
     void widgetStateChanged(shared_ptr<DecodedWidgetState> state);
     void decodeComplete(bool success, QString logName);
+    
 
 
     void lineDecoded( QString& info );

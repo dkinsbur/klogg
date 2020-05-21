@@ -211,7 +211,7 @@ class Configuration final : public Persistable<Configuration> {
     }
     void setVersionCheckingEnabled( bool enabled )
     {
-        enableVersionChecking_ = enabled;
+        enableVersionChecking_ = false;
     }
 
     bool analysisTextMaskEnabled() const

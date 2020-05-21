@@ -47,8 +47,10 @@ void DecodeManager::openLogDecoder(CrawlerWidget* logView)
     
     shared_ptr<DecodedLog> dl = make_shared<DecodedLog>(logView->logFileName());
     shared_ptr<DecodedWidgetState> state = make_shared<DecodedWidgetState>();
+    connect(dl.get(), &DecodedLog::requestedPythonInUse, this, &DecodeManager::updatePythonBusy);
     connect(dl.get(), &DecodedLog::DecodeComplete, this, &DecodeManager::updateDecodeComplete);
     connect(dl.get(), &DecodedLog::DecodeProgressUpdated, this, &DecodeManager::updateDecodeLogProgress);
+
 
     state->decoded = dl->IsDecoded();
     state->mapTypes = dl->GetMapTypes();
@@ -135,6 +137,8 @@ void DecodeManager::updateDecodeComplete(bool success)
                 break;
             }
         }
+        state->pythonBusy = false;
+
     }
 
     if (!logName.isEmpty())
@@ -148,6 +152,34 @@ void DecodeManager::updateDecodeComplete(bool success)
 
         emit widgetStateChanged(state);
     }
+}
+
+void DecodeManager::updatePythonBusy()
+{
+    bool stateChanged = false;
+    shared_ptr<DecodedWidgetState> state;
+    shared_ptr<DecodedLog> dl;
+
+    {
+        QMutexLocker locker(&lock_);
+
+        if (!getCurrents(&state, &dl))
+        {
+            return;
+        }
+
+        if (!state->pythonBusy)
+        {
+            state->pythonBusy = true;
+            stateChanged = true;
+        }
+    }
+
+    if (stateChanged)
+    {
+        emit widgetStateChanged(state);
+    }
+
 }
 
 void DecodeManager::switchCurrentLogDecoder(CrawlerWidget* logView)
@@ -200,6 +232,8 @@ void DecodeManager::generateLogMap(const QString& mapType)
             state->mapType = mapType;
             state->map = dl->GetMap(mapType);
         }
+
+        state->pythonBusy = false;
     }
 
     if (stateChanged)
@@ -227,6 +261,9 @@ void DecodeManager::decodeLine(LineNumber line, QString lineText)
 
             stateChanged = true;
         }
+
+        state->pythonBusy = false;
+
     }
 
     if (stateChanged)
@@ -257,6 +294,7 @@ void DecodeManager::decodeMapItem(uint64_t itemId)
 
             stateChanged = true;
         }
+        state->pythonBusy = false;
     }
 
     if (stateChanged)
@@ -599,8 +637,15 @@ void DecodeDockWidget::reloadWidgetState(shared_ptr<DecodedWidgetState> state)
 
     if (currState_.progress <= 0)
     {
-        decodeStatusLabel_.setText(currState_.decoded ? "Log is Decoded" : "Log is NOT decoded");
         statusbar_.removeWidget(&decodeProgressBar_);
+        //if (currState_.pythonBusy)
+        //{
+        //    statusbar_.showMessage("Python is Busy - cannot query info");
+        //}
+        {
+            decodeStatusLabel_.setText(currState_.decoded ? "Log is Decoded" : "Log is NOT decoded");
+        }
+
     }
     else
     {

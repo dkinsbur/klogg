@@ -249,9 +249,6 @@ void OptionsDialog::updateDialogFromConfig()
     keepFileClosedCheckBox->setChecked( config.keepFileClosed() );
     useLineEndingCacheCheckBox->setChecked( config.useLineEndingCache() );
 
-    // version checking
-    checkForNewVersionCheckBox->setChecked( config.versionCheckingEnabled() );
-
     analysisEnableMaskCheckBox->setChecked( config.analysisTextMaskEnabled() );
     analysisMaskRegexLineEdit->setText( config.analysisTextMaskRegex() );
     analysisMaskSubStringLineEdit->setText( config.analysisTextMaskSubString() );
@@ -322,10 +319,6 @@ void OptionsDialog::updateConfigFromDialog()
     config.setSearchReadBufferSizeLines( searchReadBufferSpinBox->value() );
     config.setKeepFileClosed( keepFileClosedCheckBox->isChecked() );
     config.setUseLineEndingCache( useLineEndingCacheCheckBox->isChecked() );
-
-    // version checking
-    config.setVersionCheckingEnabled( checkForNewVersionCheckBox->isChecked() );
-    
     config.setAnalysisTextMaskEnabled( analysisEnableMaskCheckBox->isChecked() );
     config.setAnalysisTextMaskRegex( analysisMaskRegexLineEdit->text() );
     config.setAnalysisTextMaskSubString( analysisMaskSubStringLineEdit->text() );

@@ -55,11 +55,25 @@ class DecodeWorker;
 
 typedef shared_ptr<MapItem> MapTree;
 
+class MutexTryLocker
+{
+public:
+    MutexTryLocker(QMutex* mutex, int timeout = 0);
+    ~MutexTryLocker();
+    bool locked();
+
+private:
+    QMutex* _mutex;
+    bool _locked;
+};
+
 class DecodedLog : public QObject {
 
     Q_OBJECT
 
         friend DecodeWorker;
+private:
+    static QMutex pyLock_;
   public:
     static void init();
     DecodedLog( const QString& logFileName );
@@ -81,6 +95,7 @@ class DecodedLog : public QObject {
   signals:
     void DecodeComplete( bool success );
     void DecodeProgressUpdated(int progress);
+    void requestedPythonInUse();
 
 private slots:
     void CleanupWorker();
@@ -89,13 +104,12 @@ private:
     QString fileName_;
     QString cahceFileName_;
     bool isDecoded_;
-    QMutex initMapLock_;
     QProcess process_;
     QMap<uint64_t, void*> itemInfo_;
     void* ctx_;
 private:
     DecodeWorker* worker_;
-    //QTimer timer_;
+    bool decodeSuccess;
 
 
 };

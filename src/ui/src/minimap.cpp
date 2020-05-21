@@ -84,6 +84,29 @@ PYBIND11_EMBEDDED_MODULE(logmap, m)
         .def("__repr__", [](MapItem& a) { return "MapItem(named='" + a.name() + "',id=" + to_string(a.id()) + ")"; });
 }
 
+MutexTryLocker::MutexTryLocker(QMutex* mutex, int timeout)
+{
+    _mutex = mutex;
+    _locked = mutex->tryLock(timeout);
+    LOG(logINFO) << "mutex:" << _mutex << " locekd:" << _locked;
+}
+
+MutexTryLocker::~MutexTryLocker()
+{
+    if (_locked)
+    {
+        _mutex->unlock();
+        LOG(logINFO) << "mutex:" << _mutex << " unlocekd";
+    }
+}
+
+bool MutexTryLocker::locked()
+{
+    return _locked;
+}
+
+
+
 ////////////////////////////////////////////////////
 ////// DecodedLog ////////////////////////////////
 ////////////////////////////////////////////////////
@@ -123,6 +146,9 @@ shared_ptr<GlobalPyCtx> gPyCtx;
 #define PY_CHECK_LOG_CTX_(ctx)  if((ctx)== nullptr || PY_LOG_CTX_(ctx)->pyLog.ptr() == NULL) throw exception("Log context is empty")
 #define PY_CHECK_LOG_CTX()      PY_CHECK_LOG_CTX_(ctx_)
 
+#define PY_DL_LOCK()                    MutexTryLocker locker(&pyLock_); if(!locker.locked()){/*emit requestedPythonInUse();*/ return;}
+#define PY_DL_LOCK_RETURN(val)          MutexTryLocker locker(&pyLock_); if(!locker.locked()){/*emit requestedPythonInUse();*/ return (val);}
+
 #define PY_DL_INIT                      "DecodedLog"
 #define PY_DL_IS_DECODED                "is_decoded"
 #define PY_DL_DECODE                    "decode"
@@ -136,15 +162,13 @@ shared_ptr<GlobalPyCtx> gPyCtx;
 
 void DecodeWorker::run()
 {
-    
-    bool success = false;
     PY_TRY{
         PY_CHECK_LOG_CTX_(dl_->ctx_);
-        success = PY_LOG_CTX_(dl_->ctx_)->pyLog.attr(PY_DL_DECODE)().cast<bool>();
+        dl_->decodeSuccess = PY_LOG_CTX_(dl_->ctx_)->pyLog.attr(PY_DL_DECODE)().cast<bool>();
     }PY_CATCH;
-
-    emit dl_->DecodeComplete(success);
 }
+
+QMutex DecodedLog::pyLock_;
 
 void DecodedLog::init()
 {
@@ -157,11 +181,12 @@ void DecodedLog::init()
 DecodedLog::DecodedLog( const QString& logFileName )
     : fileName_( logFileName )
     , isDecoded_( false )
-    , initMapLock_()
     , cahceFileName_(logFileName + ".info")
     , ctx_(nullptr)
     , worker_(nullptr)
 {
+    PY_DL_LOCK()
+
     PY_TRY{
         init();
         ctx_ = new LogPyCtx(gPyCtx);
@@ -185,6 +210,7 @@ QString DecodedLog::logFileName()
 
 bool DecodedLog::IsDecoded()
 {
+    PY_DL_LOCK_RETURN(false)
     PY_TRY{
         PY_CHECK_LOG_CTX();
         return PY_LOG_CTX->pyLog.attr(PY_DL_IS_DECODED)().cast<bool>();
@@ -195,39 +221,36 @@ bool DecodedLog::IsDecoded()
 
 void DecodedLog::Decode()
 {
-    if ( !initMapLock_.try_lock() ) {
+    auto locked = pyLock_.try_lock();
+    LOG(logINFO) << "mutex:" << &pyLock_ << " locekd:" << locked;
+    if (!locked) 
+    {
         LOG( logERROR ) << "already initializing map";
         return;
     }
 
-    //timer_.setInterval(500);
-    //connect(&timer_, &QTimer::timeout, [this]()
-    //{
-    //    LOG(logERROR) << "timer" << this << " " << QThread::currentThread() << " " << this->thread();
-    //});// &DecodedLog::checkProgress);
-    //timer_.start(500);
 
+    decodeSuccess = false;
     worker_ = new DecodeWorker(this);
     connect(worker_, &QThread::finished, this, &DecodedLog::CleanupWorker);
     worker_->start();
-
 }
 
 void DecodedLog::CleanupWorker()
 {
-    // cleanup timer
-    //timer_.stop();
-
     disconnect(worker_, &QThread::finished, this, &DecodedLog::CleanupWorker);
     delete worker_;
     worker_ = nullptr;
-    initMapLock_.unlock();
+    LOG(logINFO) << "mutex:" << &pyLock_ << " unlock";
+    pyLock_.unlock();
+
+    emit DecodeComplete(decodeSuccess);
 }
 void DecodedLog::checkProgress()
 {
     LOG(logINFO) << "checknig progress";
     int progress = -1;
-
+    PY_DL_LOCK()
     PY_TRY{
         PY_CHECK_LOG_CTX();
         progress = PY_LOG_CTX->pyLog.attr(PY_DL_GET_DECODE_PROGRESS)().cast<int>();
@@ -239,25 +262,26 @@ void DecodedLog::checkProgress()
 
 void DecodedLog::DecodeAbort()
 {
-    LOG(logINFO) << "Aborting Decode";
-
-    if (initMapLock_.tryLock())
-    {
-        LOG(logINFO) << "Currently not decoding";
-        initMapLock_.unlock();
-        return;
-    }
-    
-    PY_TRY{
-        PY_CHECK_LOG_CTX();
-        PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_ABORT)().cast<bool>();
-    }PY_CATCH;
+    //LOG(logINFO) << "Aborting Decode";
+    //
+    //if (initMapLock_.tryLock())
+    //{
+    //    LOG(logINFO) << "Currently not decoding";
+    //    initMapLock_.unlock();
+    //    return;
+    //}
+    //
+    //PY_TRY{
+    //    PY_CHECK_LOG_CTX();
+    //    PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_ABORT)().cast<bool>();
+    //}PY_CATCH;
 
 }
 
 
 QString DecodedLog::DecodeLine( const QString& logLine )
 {
+    PY_DL_LOCK_RETURN("")
     PY_TRY{
         PY_CHECK_LOG_CTX();
         return QString::fromStdString(PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_LINE)(logLine.toStdString()).cast<string>());
@@ -267,6 +291,7 @@ QString DecodedLog::DecodeLine( const QString& logLine )
 
 QString DecodedLog::DecodeItem( uint64_t id )
 {
+    PY_DL_LOCK_RETURN("")
     PY_TRY{
         PY_CHECK_LOG_CTX();
        return QString::fromStdString(PY_LOG_CTX->pyLog.attr(PY_DL_DECODE_MAP_ITEM)(id).cast<string>());
@@ -277,6 +302,7 @@ QString DecodedLog::DecodeItem( uint64_t id )
 
 QList<uint32_t> DecodedLog::ItemLines(uint64_t id)
 {
+    PY_DL_LOCK_RETURN(QList<uint32_t>())
     PY_TRY{
         PY_CHECK_LOG_CTX();
        return QList<uint32_t>::fromStdList(PY_LOG_CTX->pyLog.attr(PY_DL_GET_MAP_ITEM_LOG_LINES)(id).cast<list<uint32_t>>());
@@ -289,6 +315,8 @@ QList<uint32_t> DecodedLog::ItemLines(uint64_t id)
 QStringList DecodedLog::GetMapTypes()
 {
     QStringList types;
+    
+    PY_DL_LOCK_RETURN(QStringList())
     PY_TRY{
         PY_CHECK_LOG_CTX();
         auto stdTypes = PY_LOG_CTX->pyLog.attr(PY_DL_GET_MAP_TYPES)().cast<list<string>>();
@@ -304,6 +332,7 @@ QStringList DecodedLog::GetMapTypes()
 
 MapTree DecodedLog::GetMap(const QString& type)
 {
+    PY_DL_LOCK_RETURN(MapTree(nullptr))
     PY_TRY{
         PY_CHECK_LOG_CTX();
         auto root = PY_LOG_CTX->pyLog.attr(PY_DL_GET_MAP)(type.toStdString()).cast<MapItem*>();
